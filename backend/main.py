@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
-from backend.routers import health, imports, transactions, profile
+from backend.routers import health, imports, transactions, profile, goals
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -21,6 +21,8 @@ app.include_router(health.router)
 app.include_router(imports.router)
 app.include_router(transactions.router)
 app.include_router(profile.router)
+app.include_router(goals.router)
+
 
 
 
