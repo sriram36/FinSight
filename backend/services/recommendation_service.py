@@ -146,6 +146,13 @@ def generate_recommendation(
                 "Discretionary adjustment assumes consistent recurring income."
             ]
 
+    # Strict Claim Verification
+    from backend.services.verifier_service import verify_recommendation_claims
+    combined_text = f"{action} {reason}"
+    verification = verify_recommendation_claims(combined_text, evidence) if evidence else None
+    is_verified = verification.is_verified if verification else False
+    verifier_notes = verification.notes if verification else "No evidence claims to verify."
+
     # Save to database
     cursor = db.cursor()
     cursor.execute("""
@@ -156,8 +163,8 @@ def generate_recommendation(
     """, (
         rec_id, user_id, config.value, cat, action, reason,
         json.dumps(evidence), impact, json.dumps(assumptions),
-        1 if config.value == "C" and evidence else 0,
-        "Numeric claims grounded in calculated evidence" if config.value == "C" and evidence else None,
+        1 if is_verified else 0,
+        verifier_notes,
         now_iso
     ))
     db.commit()
@@ -172,7 +179,8 @@ def generate_recommendation(
         evidence=evidence,
         expected_impact=impact,
         assumptions=assumptions,
-        is_verified=(config.value == "C" and bool(evidence)),
-        verifier_notes="Numeric claims grounded in calculated evidence" if config.value == "C" and evidence else None,
+        is_verified=is_verified,
+        verifier_notes=verifier_notes,
         created_at=now_iso
     )
+
