@@ -1,0 +1,101 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Optional
+import json
+from datetime import datetime, timedelta, timezone
+from backend.database import get_db
+from backend.schemas.recommendation import (
+    RecommendationRequest,
+    RecommendationRead,
+    RecommendationConfig
+)
+from backend.services.recommendation_service import generate_recommendation
+
+router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
+
+@router.post("/generate", response_model=RecommendationRead)
+def generate_recommendation_endpoint(
+    req: RecommendationRequest,
+    db=Depends(get_db)
+):
+    cursor = db.cursor()
+    recent_end = req.recent_end
+    if not recent_end:
+        cursor.execute("SELECT MAX(transaction_date) FROM transactions WHERE user_id = ?", (req.user_id,))
+        max_row = cursor.fetchone()
+        if max_row and max_row[0]:
+            r_end = datetime.strptime(max_row[0][:10], "%Y-%m-%d")
+        else:
+            r_end = datetime.now(timezone.utc)
+        recent_end = r_end.strftime("%Y-%m-%d")
+
+    r_end_dt = datetime.strptime(recent_end[:10], "%Y-%m-%d")
+    recent_start = req.recent_start or (r_end_dt - timedelta(days=29)).strftime("%Y-%m-%d")
+    r_start_dt = datetime.strptime(recent_start[:10], "%Y-%m-%d")
+
+    baseline_end = req.baseline_end or (r_start_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    b_end_dt = datetime.strptime(baseline_end[:10], "%Y-%m-%d")
+    baseline_start = req.baseline_start or (b_end_dt - timedelta(days=89)).strftime("%Y-%m-%d")
+
+    return generate_recommendation(
+        user_id=req.user_id,
+        config=req.configuration,
+        baseline_start=baseline_start,
+        baseline_end=baseline_end,
+        recent_start=recent_start,
+        recent_end=recent_end,
+        db=db
+    )
+
+@router.get("", response_model=List[RecommendationRead])
+def list_recommendations(user_id: str = "default_user", db=Depends(get_db)):
+    cursor = db.cursor()
+    cursor.execute("""
+    SELECT id, user_id, configuration, category, action, reason, evidence_json,
+           expected_impact, assumptions, is_verified, verifier_notes, created_at
+    FROM recommendations WHERE user_id = ? ORDER BY created_at DESC
+    """, (user_id,))
+    rows = cursor.fetchall()
+
+    results = []
+    for r in rows:
+        results.append(RecommendationRead(
+            id=r["id"],
+            user_id=r["user_id"],
+            configuration=r["configuration"],
+            category=r["category"],
+            action=r["action"],
+            reason=r["reason"],
+            evidence=json.loads(r["evidence_json"] or "{}"),
+            expected_impact=float(r["expected_impact"]) if r["expected_impact"] is not None else None,
+            assumptions=json.loads(r["assumptions"] or "[]"),
+            is_verified=bool(r["is_verified"]),
+            verifier_notes=r["verifier_notes"],
+            created_at=r["created_at"]
+        ))
+    return results
+
+@router.get("/{rec_id}/evidence")
+def inspect_recommendation_evidence(rec_id: str, user_id: str = "default_user", db=Depends(get_db)):
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM recommendations WHERE id = ? AND user_id = ?", (rec_id, user_id))
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Recommendation not found.")
+
+    evidence = json.loads(row["evidence_json"] or "{}")
+    source_ids = evidence.get("source_transaction_ids", [])
+    source_txs = []
+    if source_ids:
+        placeholders = ",".join("?" for _ in source_ids)
+        cursor.execute(f"SELECT * FROM transactions WHERE id IN ({placeholders})", source_ids)
+        source_txs = [dict(t) for t in cursor.fetchall()]
+
+    return {
+        "recommendation_id": rec_id,
+        "configuration": row["configuration"],
+        "category": row["category"],
+        "is_verified": bool(row["is_verified"]),
+        "verifier_notes": row["verifier_notes"],
+        "evidence": evidence,
+        "source_transactions": source_txs
+    }
