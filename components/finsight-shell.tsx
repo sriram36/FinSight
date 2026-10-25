@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -114,8 +115,8 @@ export function FinSightShell() {
       >
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <span className="text-sm font-semibold">F</span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-border bg-card p-1 shadow-xs">
+              <Image src="/logo.svg" alt="FinSight AI Logo" width={26} height={26} className="object-contain" priority />
             </div>
             <div>
               <p className="text-[15px] font-semibold tracking-tight">FinSight AI</p>
