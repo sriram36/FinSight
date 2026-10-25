@@ -141,7 +141,7 @@ def get_connection(db_target: Optional[str] = None):
         conn.execute("PRAGMA foreign_keys = ON;")
         return conn
 
-def init_db(db_target: Optional[str] = None):
+def init_db(db_target: Optional[str] = None, auto_seed: bool = True):
     conn = get_connection(db_target)
     cursor = conn.cursor()
     
@@ -255,6 +255,15 @@ def init_db(db_target: Optional[str] = None):
     """)
 
     conn.commit()
+
+    if auto_seed:
+        try:
+            from backend.seed import seed_demo_data
+            seed_demo_data(conn)
+        except Exception as e:
+            # Non-fatal if seed fails
+            pass
+
     conn.close()
 
 # Dependency for FastAPI
