@@ -158,14 +158,24 @@ def init_db(db_target: Optional[str] = None, auto_seed: bool = True):
     """)
 
     # Safe migrations for existing users table
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT;")
-    except Exception:
-        pass
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN salt TEXT;")
-    except Exception:
-        pass
+    if is_postgres(db_target):
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS salt TEXT;")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+    else:
+        try:
+            cursor.execute("PRAGMA table_info(users);")
+            existing_cols = [r[1] for r in cursor.fetchall()]
+            if "password_hash" not in existing_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT;")
+            if "salt" not in existing_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN salt TEXT;")
+            conn.commit()
+        except Exception:
+            pass
 
     # Transactions table
     cursor.execute("""
