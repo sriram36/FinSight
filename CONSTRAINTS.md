@@ -2,7 +2,7 @@
 
 **Status:** Active Contract  
 **Created:** 2026-10-24  
-**Specification:** [FinSight_AI_Complete_PRD.md](file:///d:/FinSight/FinSight_AI_Complete_PRD.md)
+**Specification:** [FinSight_AI_Complete_PRD.md](FinSight_AI_Complete_PRD.md)
 
 ---
 

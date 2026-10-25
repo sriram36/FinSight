@@ -204,7 +204,7 @@ export const api = {
   getResearchAudit: () => request<any>('/research/audit'),
   getTemporalSplit: () => request<any>('/research/split'),
   getBenchmark: () => request<any[]>('/research/benchmark'),
-  runPerturbation: (data?: { seed?: number; target_category?: string; delta_pct?: number }) =>
+  runPerturbation: (data?: { user_id?: string; seed?: number; target_category?: string; delta_pct?: number }) =>
     request<any>('/research/perturbation', {
       method: 'POST',
       body: JSON.stringify(data || {}),

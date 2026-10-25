@@ -26,6 +26,7 @@ export function ResearchView() {
   const [error, setError] = useState<string | null>(null)
 
   // Perturbation experiment state
+  const [selectedUser, setSelectedUser] = useState('syn_user_01')
   const [targetCategory, setTargetCategory] = useState('Dining Out')
   const [deltaPct, setDeltaPct] = useState(150)
   const [seed, setSeed] = useState(42)
@@ -64,6 +65,7 @@ export function ResearchView() {
     setRunningPerturbation(true)
     try {
       const res = await api.runPerturbation({
+        user_id: selectedUser,
         seed,
         target_category: targetCategory,
         delta_pct: deltaPct,
@@ -194,7 +196,10 @@ export function ResearchView() {
                       <div className="text-xs text-muted-foreground max-w-xs">{row.description}</div>
                     </td>
                     <td className="px-5 py-4 text-right font-semibold">
-                      {(row.decision_agreement * 100).toFixed(1)}%
+                      <div>{(row.decision_agreement * 100).toFixed(1)}%</div>
+                      {row.decision_agreement_ratio && (
+                        <div className="text-[10px] text-muted-foreground font-normal">{row.decision_agreement_ratio}</div>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span
@@ -206,6 +211,9 @@ export function ResearchView() {
                       >
                         {(row.numeric_verification_pass_rate * 100).toFixed(1)}%
                       </span>
+                      {row.numeric_verification_ratio && (
+                        <div className="text-[10px] text-muted-foreground">{row.numeric_verification_ratio}</div>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span
@@ -217,6 +225,9 @@ export function ResearchView() {
                       >
                         {(row.hallucination_rate * 100).toFixed(1)}%
                       </span>
+                      {row.hallucination_ratio && (
+                        <div className="text-[10px] text-muted-foreground">{row.hallucination_ratio}</div>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span
@@ -228,6 +239,9 @@ export function ResearchView() {
                       >
                         {row.protected_category_violations}
                       </span>
+                      {row.protected_violations_ratio && (
+                        <div className="text-[10px] text-muted-foreground">{row.protected_violations_ratio}</div>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-center">
                       {row.evidence_grounded ? (
@@ -275,7 +289,23 @@ export function ResearchView() {
         </div>
 
         {/* Experiment Parameters */}
-        <div className="grid gap-4 mt-5 sm:grid-cols-3">
+        <div className="grid gap-4 mt-5 sm:grid-cols-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Evaluation Persona</label>
+            <select
+              value={selectedUser}
+              onChange={e => setSelectedUser(e.target.value)}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {audit?.user_distribution && Object.keys(audit.user_distribution).map((u: string) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+              {!audit?.user_distribution && (
+                <option value="syn_user_01">syn_user_01</option>
+              )}
+            </select>
+          </div>
+
           <div>
             <label className="text-xs font-medium text-muted-foreground">Target Discretionary Category</label>
             <select
@@ -284,10 +314,11 @@ export function ResearchView() {
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="Dining Out">Dining Out</option>
-              <option value="Groceries">Groceries</option>
               <option value="Shopping">Shopping</option>
               <option value="Coffee & Snacks">Coffee & Snacks</option>
               <option value="Entertainment">Entertainment</option>
+              <option value="Subscriptions">Subscriptions</option>
+              <option value="Transportation">Transportation</option>
             </select>
           </div>
 
@@ -319,7 +350,13 @@ export function ResearchView() {
         {/* Perturbation Outcome */}
         {perturbationResult && (
           <div className="mt-6 space-y-4 animate-in fade-in">
-            <div className="grid gap-4 sm:grid-cols-3 rounded-lg bg-muted/40 p-4 text-xs">
+            <div className="grid gap-4 sm:grid-cols-4 rounded-lg bg-muted/40 p-4 text-xs">
+              <div>
+                <span className="text-muted-foreground">Neutralized Pre-Existing Top:</span>
+                <p className="text-sm font-semibold mt-0.5 text-muted-foreground">
+                  {perturbationResult.neutralized_original_category} (Scaled to baseline)
+                </p>
+              </div>
               <div>
                 <span className="text-muted-foreground">Pre-perturbation Spend:</span>
                 <p className="text-sm font-semibold mt-0.5">
@@ -335,7 +372,7 @@ export function ResearchView() {
               <div>
                 <span className="text-muted-foreground">Injected Deviation:</span>
                 <p className="text-sm font-semibold mt-0.5 text-emerald-600 dark:text-emerald-400">
-                  {perturbationResult.injected_delta_pct}
+                  {perturbationResult.injected_delta_pct} ({perturbationResult.post_perturbation_deviation_pct})
                 </p>
               </div>
             </div>

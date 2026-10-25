@@ -160,9 +160,14 @@ export function RecommendationsView({ onOpenImport }: RecommendationsViewProps) 
                         {recommendation.category}
                       </span>
                     )}
-                    {recommendation.is_verified && (
+                    {recommendation.is_verified && recommendation.configuration !== 'A' && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                         <FileCheck2 className="size-3.5" /> Verified Grounded
+                      </span>
+                    )}
+                    {recommendation.configuration === 'A' && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                        Rule Baseline
                       </span>
                     )}
                   </div>
