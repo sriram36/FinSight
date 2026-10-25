@@ -136,6 +136,8 @@ def generate_recommendation(
                 "recent_daily_pace": top.recent_daily_pace,
                 "baseline_daily_pace": top.baseline_daily_pace,
                 "percentage_deviation": top.percentage_deviation,
+                "expected_impact": monthly_impact,
+                "monthly_impact": monthly_impact,
                 "period_days": profile.recent_days,
                 "transaction_count": top.transaction_count_recent,
                 "source_transaction_ids": top.recent_transaction_ids

@@ -42,7 +42,11 @@ def parse_date_safely(date_str: str) -> Optional[str]:
     if not clean_str:
         return None
     try:
-        # Try dateutil parser
+        import re
+        m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})", clean_str)
+        if m:
+            y, mo, d = m.groups()
+            return f"{int(y):04d}-{int(mo):02d}-{int(d):02d}"
         dt = date_parser.parse(clean_str, dayfirst=True)
         return dt.strftime("%Y-%m-%d")
     except Exception:
@@ -91,8 +95,17 @@ def detect_column_mappings(headers: List[str]) -> Dict[str, str]:
                 mapping["credit"] = orig
                 break
 
+    # Direction / Type
+    for candidate in ["transaction type", "tx type", "direction", "type", "dr/cr", "cr/dr"]:
+        for h, orig in h_lower.items():
+            if candidate == h or (candidate in h and "category" not in h):
+                mapping["direction"] = orig
+                break
+        if "direction" in mapping:
+            break
+
     # Category
-    for candidate in ["category", "tag", "classification", "type"]:
+    for candidate in ["category", "tag", "classification"]:
         for h, orig in h_lower.items():
             if candidate in h:
                 mapping["category"] = orig
@@ -132,6 +145,7 @@ def parse_csv_preview(
     debit_col = mapping.get("debit")
     credit_col = mapping.get("credit")
     cat_col = mapping.get("category")
+    dir_col = mapping.get("direction")
 
     rows: List[CSVPreviewRow] = []
     accepted = 0
@@ -165,21 +179,32 @@ def parse_csv_preview(
         else:
             desc = "Transaction"
 
+        # Direction detection from direction column if present
+        explicit_dir = None
+        if dir_col and row.get(dir_col):
+            val = row[dir_col].strip().lower()
+            if val in ["debit", "dr", "withdrawal", "payment", "spend", "spending", "expense"]:
+                explicit_dir = TransactionDirection.SPENDING
+            elif val in ["credit", "cr", "deposit", "income", "salary", "refund"]:
+                explicit_dir = TransactionDirection.INCOME
+
         # Amount and Direction
         if not err:
             try:
                 if debit_col and row.get(debit_col) and row[debit_col].strip():
                     raw_val = float(row[debit_col].replace(",", "").replace("₹", "").replace("$", ""))
                     amount = abs(raw_val)
-                    direction = TransactionDirection.SPENDING
+                    direction = explicit_dir or TransactionDirection.SPENDING
                 elif credit_col and row.get(credit_col) and row[credit_col].strip():
                     raw_val = float(row[credit_col].replace(",", "").replace("₹", "").replace("$", ""))
                     amount = abs(raw_val)
-                    direction = TransactionDirection.INCOME
+                    direction = explicit_dir or TransactionDirection.INCOME
                 elif amt_col and row.get(amt_col) and row[amt_col].strip():
                     raw_val = float(row[amt_col].replace(",", "").replace("₹", "").replace("$", ""))
                     amount = abs(raw_val)
-                    if raw_val > 0:
+                    if explicit_dir is not None:
+                        direction = explicit_dir
+                    elif raw_val > 0:
                         direction = TransactionDirection.INCOME
                     else:
                         direction = TransactionDirection.SPENDING
