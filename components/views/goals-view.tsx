@@ -13,9 +13,12 @@ import {
   TrendingUp,
   X,
   Loader2,
-  HelpCircle,
+  Sparkles,
+  ArrowRight,
+  Clock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getCategoryMeta } from '@/components/ui/category-badge'
 import { api } from '@/lib/api-client'
 import { Goal, CategoryPreference } from '@/lib/types'
 
@@ -79,10 +82,10 @@ export function GoalsView() {
   }
 
   const handleDeleteGoal = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this goal?')) return
+    if (!confirm('Are you sure you want to remove this financial milestone?')) return
     try {
       await api.deleteGoal(id)
-      setGoals(prev => prev.filter(g => g.id !== id))
+      setGoals((prev) => prev.filter((g) => g.id !== id))
     } catch (err: any) {
       alert(`Error deleting goal: ${err.message}`)
     }
@@ -92,8 +95,10 @@ export function GoalsView() {
     const newProtected = !cat.is_protected
     try {
       // Optimistic update
-      setCategories(prev =>
-        prev.map(c => (c.category === cat.category ? { ...c, is_protected: newProtected } : c))
+      setCategories((prev) =>
+        prev.map((c) =>
+          c.category === cat.category ? { ...c, is_protected: newProtected } : c
+        )
       )
       await api.updateCategoryPreference(cat.category, {
         is_protected: newProtected,
@@ -110,160 +115,230 @@ export function GoalsView() {
   }, [goals])
 
   const feasibleCount = useMemo(() => {
-    return goals.filter(g => g.is_feasible).length
+    return goals.filter((g) => g.is_feasible).length
   }, [goals])
 
   const protectedCount = useMemo(() => {
-    return categories.filter(c => c.is_protected).length
+    return categories.filter((c) => c.is_protected).length
   }, [categories])
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Metrics Row */}
+      {/* Metrics Row with Glass Panels */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">Active Goals</span>
-            <Target className="size-4" />
+        {/* Active Goals */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-primary/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Active Milestones
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10 text-purple-500">
+              <Target className="size-4" />
+            </div>
           </div>
-          <p className="mt-3 text-2xl font-bold tracking-tight">{goals.length}</p>
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground">{goals.length}</p>
           <p className="mt-1 text-xs text-muted-foreground">Target financial milestones</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">Monthly Needed</span>
-            <TrendingUp className="size-4" />
+        {/* Monthly Needed */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-amber-500/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Monthly Needed
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-500">
+              <TrendingUp className="size-4" />
+            </div>
           </div>
-          <p className="mt-3 text-2xl font-bold tracking-tight">
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground">
             ₹{totalMonthlyCommitment.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Total required across all active goals</p>
+          <p className="mt-1 text-xs text-muted-foreground">Cumulative monthly reservation required</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">Feasibility Status</span>
-            <CheckCircle2 className="size-4 text-emerald-500" />
+        {/* Feasibility Status */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-emerald-500/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Feasibility Rate
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
+              <CheckCircle2 className="size-4" />
+            </div>
           </div>
-          <p className="mt-3 text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
             {feasibleCount} / {goals.length}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Goals within realistic cashflow range</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {goals.length > 0 && feasibleCount === goals.length
+              ? '100% covered by cash flow surplus'
+              : 'Goals achievable without budget deficit'}
+          </p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">Protected Categories</span>
-            <ShieldCheck className="size-4 text-sky-500" />
+        {/* Protected Invariants */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-sky-500/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+              Protected Invariants
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-500">
+              <ShieldCheck className="size-4" />
+            </div>
           </div>
-          <p className="mt-3 text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-400">
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-sky-600 dark:text-sky-400">
             {protectedCount}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Excluded from AI spending cuts</p>
+          <p className="mt-1 text-xs text-muted-foreground">Immune to AI spending reductions</p>
         </div>
       </div>
 
-      {/* Main Content: Goals List */}
-      <section className="rounded-xl border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+      {/* Main Content: Goals Grid */}
+      <section className="glass-panel rounded-2xl border border-border bg-card shadow-xs">
+        <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
-            <h2 className="font-semibold text-foreground">Your Goals & Milestones</h2>
+            <div className="flex items-center gap-2">
+              <Target className="size-5 text-primary" />
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
+                Target Savings Milestones
+              </h2>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Deterministic feasibility calculation evaluated against net cash flow surplus.
+              Deterministic feasibility calculation evaluated against net cash flow pace. Active goals are automatically reserved in the “Can I Afford This?” simulator.
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} className="gap-2 self-start sm:self-auto">
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="gap-2 self-start rounded-xl text-xs font-semibold sm:self-auto shadow-xs"
+          >
             <Plus className="size-4" />
             New Goal
           </Button>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center p-12 text-sm text-muted-foreground">
-            <Loader2 className="mr-2 size-5 animate-spin" /> Loading goals...
+          <div className="flex items-center justify-center p-20 text-sm font-medium text-muted-foreground">
+            <Loader2 className="mr-2 size-5 animate-spin text-primary" /> Loading financial milestones...
           </div>
         ) : error ? (
           <div className="p-6 text-sm text-rose-500">{error}</div>
         ) : goals.length === 0 ? (
-          <div className="p-12 text-center">
-            <Target className="mx-auto size-10 text-muted-foreground/40" />
-            <h3 className="mt-3 text-sm font-semibold">No goals created yet</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Define target goals like an Emergency Fund or Vacation to track required monthly savings.
+          <div className="p-16 text-center">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-border bg-muted/40 text-muted-foreground shadow-xs">
+              <Target className="size-7" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold tracking-tight">No active goals defined</h3>
+            <p className="mt-1.5 max-w-sm mx-auto text-xs leading-relaxed text-muted-foreground">
+              Define target goals like an Emergency Cushion, Vehicle, or Travel Fund to track required monthly savings pace.
             </p>
-            <Button onClick={() => setIsModalOpen(true)} variant="outline" className="mt-4 gap-2">
-              <Plus className="size-4" /> Create your first goal
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              variant="outline"
+              className="mt-5 gap-2 rounded-xl text-xs font-semibold"
+            >
+              <Plus className="size-4 text-primary" /> Create your first goal
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
-            {goals.map(goal => {
-              const progress = Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100)) || 0
+          <div className="grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
+            {goals.map((goal) => {
+              const progress =
+                Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100)) || 0
+              const isFeasible = goal.is_feasible
+
               return (
                 <div
                   key={goal.id}
-                  className="relative flex flex-col justify-between rounded-xl border border-border bg-card/60 p-5 shadow-xs hover:border-primary/40 transition-colors"
+                  className="glass-panel group relative flex flex-col justify-between rounded-2xl border border-border bg-card/60 p-5 shadow-xs transition hover:border-primary/40 hover:shadow-md"
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-2">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-semibold text-foreground">{goal.title}</h3>
+                        <h3 className="text-base font-bold tracking-tight text-foreground">
+                          {goal.title}
+                        </h3>
                         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Calendar className="size-3.5" />
-                          Target: {goal.target_date} ({goal.months_remaining.toFixed(1)} mos left)
+                          <Calendar className="size-3.5 text-muted-foreground" />
+                          Target: {goal.target_date}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleDeleteGoal(goal.id)}
-                        className="text-muted-foreground hover:text-rose-500 transition-colors p-1"
-                        aria-label="Delete goal"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                          <Clock className="size-3" />
+                          {goal.months_remaining.toFixed(1)} mos
+                        </span>
+                        <button
+                          onClick={() => handleDeleteGoal(goal.id)}
+                          className="rounded-lg p-1.5 text-muted-foreground opacity-60 transition hover:bg-rose-500/10 hover:text-rose-600 hover:opacity-100 dark:hover:bg-rose-500/20"
+                          aria-label={`Delete goal ${goal.title}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="mt-4">
+                    {/* Progress Bar & Amounts */}
+                    <div className="mt-5">
                       <div className="flex items-baseline justify-between text-xs">
-                        <span className="font-medium text-foreground">
+                        <span className="font-mono text-sm font-bold text-foreground">
                           ₹{goal.current_amount.toLocaleString('en-IN')}
                         </span>
-                        <span className="text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           of ₹{goal.target_amount.toLocaleString('en-IN')}
                         </span>
                       </div>
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+
+                      <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
                         <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            isFeasible
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : 'bg-gradient-to-r from-amber-500 to-rose-400'
+                          }`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <div className="mt-1 text-right text-[11px] text-muted-foreground">
-                        {progress}% achieved
+
+                      <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{progress}% accumulated</span>
+                        <span className="font-semibold text-foreground">
+                          ₹{(goal.target_amount - goal.current_amount).toLocaleString('en-IN')} to go
+                        </span>
                       </div>
                     </div>
 
-                    <div className="mt-4 rounded-lg bg-muted/40 p-3 text-xs space-y-1.5">
-                      <div className="flex justify-between">
+                    {/* Feasibility Card Footer */}
+                    <div className="mt-5 rounded-xl border border-border/70 bg-muted/30 p-3.5 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Monthly needed:</span>
-                        <span className="font-semibold text-foreground">
-                          ₹{goal.monthly_needed.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/mo
+                        <span className="font-mono font-bold text-foreground">
+                          ₹
+                          {goal.monthly_needed.toLocaleString('en-IN', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          })}
+                          /mo
                         </span>
                       </div>
+
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Feasibility:</span>
-                        {goal.is_feasible ? (
-                          <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="size-3" /> Feasible
+                        {isFeasible ? (
+                          <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="size-3.5" /> Feasible Pace
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 font-medium text-rose-600 dark:text-rose-400">
-                            <AlertTriangle className="size-3" /> Shortfall ₹{Math.round(goal.shortfall || 0).toLocaleString('en-IN')}
+                          <span className="inline-flex items-center gap-1 font-semibold text-rose-600 dark:text-rose-400">
+                            <AlertTriangle className="size-3.5" /> Shortfall ₹
+                            {Math.round(goal.shortfall || 0).toLocaleString('en-IN')}
                           </span>
                         )}
                       </div>
+
                       {goal.feasibility_notes && (
-                        <p className="text-[11px] text-muted-foreground border-t border-border/50 pt-1.5 mt-1.5">
+                        <p className="border-t border-border/50 pt-2 text-[11px] leading-relaxed text-muted-foreground">
                           {goal.feasibility_notes}
                         </p>
                       )}
@@ -276,134 +351,176 @@ export function GoalsView() {
         )}
       </section>
 
-      {/* Protected Categories Section */}
-      <section className="rounded-xl border border-border bg-card">
-        <div className="border-b border-border p-5">
-          <div className="flex items-center gap-2">
-            <Shield className="size-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Protected Category Invariants</h2>
+      {/* Protected Category Invariants Section */}
+      <section className="glass-panel rounded-2xl border border-border bg-card shadow-xs">
+        <div className="border-b border-border p-5 sm:p-6">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500 border border-sky-500/20">
+              <Shield className="size-4" />
+            </div>
+            <h2 className="text-lg font-bold tracking-tight text-foreground">
+              Protected Category Invariants
+            </h2>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Any category protected below will be strictly shielded. The AI recommendation engine and simulator are algorithmically prohibited from suggesting reductions in protected categories.
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+            Categories protected below are mathematically non-negotiable. The AI recommendation engine and purchase simulator are algorithmically prohibited from suggesting reductions in protected categories.
           </p>
         </div>
 
-        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map(cat => (
-            <div
-              key={cat.category}
-              className={`flex items-center justify-between rounded-lg border p-3.5 transition-colors ${
-                cat.is_protected
-                  ? 'border-sky-500/40 bg-sky-500/5'
-                  : 'border-border bg-card hover:bg-muted/30'
-              }`}
-            >
-              <div className="min-w-0 pr-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{cat.category}</span>
-                  {cat.is_protected && (
-                    <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-600 dark:text-sky-400">
-                      Protected
-                    </span>
-                  )}
-                </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-                  {cat.is_protected ? cat.reason || 'Protected from AI budget cuts' : 'Normal category'}
-                </p>
-              </div>
+        <div className="grid gap-3.5 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
+          {categories.map((cat) => {
+            const meta = getCategoryMeta(cat.category)
+            const Icon = meta.icon
 
-              <button
-                onClick={() => handleToggleProtection(cat)}
-                type="button"
-                role="switch"
-                aria-checked={cat.is_protected}
-                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  cat.is_protected ? 'bg-sky-600' : 'bg-muted'
+            return (
+              <div
+                key={cat.category}
+                className={`flex items-center justify-between rounded-xl border p-4 transition ${
+                  cat.is_protected
+                    ? 'border-sky-500/40 bg-sky-500/5 shadow-xs'
+                    : 'border-border bg-card/60 hover:border-border/90 hover:bg-muted/30'
                 }`}
               >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    cat.is_protected ? 'translate-x-4' : 'translate-x-0'
+                <div className="flex items-center gap-3 min-w-0 pr-2">
+                  <div
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl border ${
+                      cat.is_protected
+                        ? 'border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                        : 'border-border bg-muted/40 text-muted-foreground'
+                    }`}
+                  >
+                    <Icon className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold tracking-tight text-foreground truncate">
+                        {cat.category}
+                      </span>
+                      {cat.is_protected && (
+                        <span className="rounded-full bg-sky-500/15 px-2 py-0.2 text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                          Shielded
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
+                      {cat.is_protected
+                        ? cat.reason || 'Protected from AI budget cuts'
+                        : 'Discretionary eligible'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleToggleProtection(cat)}
+                  type="button"
+                  role="switch"
+                  aria-checked={cat.is_protected}
+                  aria-label={`Toggle protection for ${cat.category}`}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500/40 ${
+                    cat.is_protected ? 'bg-sky-600' : 'bg-muted'
                   }`}
-                />
-              </button>
-            </div>
-          ))}
+                >
+                  <span
+                    className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      cat.is_protected ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            )
+          })}
         </div>
       </section>
 
       {/* Modal: New Goal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-4 border-b border-border">
-              <h3 className="text-base font-semibold">Create Savings Goal</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <h3 className="text-base font-bold tracking-tight">Create Savings Milestone</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Establish a target reserve for feasibility analysis.
+                </p>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
+                className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted"
+                aria-label="Close"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateGoal} className="mt-4 space-y-4">
+            <form onSubmit={handleCreateGoal} className="mt-5 space-y-4 text-xs">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Goal Title</label>
+                <label className="mb-1.5 block font-semibold text-foreground">Milestone Title</label>
                 <input
                   type="text"
                   required
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="e.g. Emergency Fund, Laptop, Vacation"
-                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. 6-Month Emergency Cushion, Laptop, Japan Trip"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Target Amount (₹)</label>
+                  <label className="mb-1.5 block font-semibold text-foreground">Target Amount (₹)</label>
                   <input
                     type="number"
                     required
                     min="1"
                     step="any"
                     value={targetAmount}
-                    onChange={e => setTargetAmount(e.target.value)}
+                    onChange={(e) => setTargetAmount(e.target.value)}
                     placeholder="100000"
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3.5 text-sm font-mono font-bold focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Current Saved (₹)</label>
+                  <label className="mb-1.5 block font-semibold text-foreground">Currently Saved (₹)</label>
                   <input
                     type="number"
                     min="0"
                     step="any"
                     value={currentAmount}
-                    onChange={e => setCurrentAmount(e.target.value)}
+                    onChange={(e) => setCurrentAmount(e.target.value)}
                     placeholder="0"
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3.5 text-sm font-mono font-bold focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Target Date</label>
+                <label className="mb-1.5 block font-semibold text-foreground">Target Completion Date</label>
                 <input
                   type="date"
                   required
                   value={targetDate}
-                  onChange={e => setTargetDate(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+              <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setIsModalOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Creating...' : 'Create Goal'}
+                <Button type="submit" disabled={submitting} className="rounded-xl font-semibold gap-2">
+                  {submitting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Creating...
+                    </>
+                  ) : (
+                    'Establish Milestone'
+                  )}
                 </Button>
               </div>
             </form>

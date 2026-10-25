@@ -1,10 +1,23 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
-  title: 'FinSight AI | Personal finance, clearer',
-  description: 'Evidence-grounded personal finance insights with deterministic calculations and privacy-first design.',
+  title: 'FinSight AI | Evidence-Grounded Financial Copilot',
+  description: 'Evidence-grounded personal finance copilot with deterministic calculations, claim verification, and Microsoft Foundry gpt-5.6-luna.',
   generator: 'FinSight AI',
   icons: {
     icon: '/icon.svg',
@@ -14,8 +27,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: 'light dark',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#090d16' },
   ],
 }
 
@@ -25,8 +38,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <html lang="en" className={`${jakarta.variable} ${mono.variable}`}>
+      <body className="font-sans antialiased selection:bg-primary/20 selection:text-primary">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

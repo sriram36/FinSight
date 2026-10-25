@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Search,
-  Filter,
   Plus,
   Trash2,
   ChevronLeft,
@@ -12,17 +11,23 @@ import {
   ArrowUpRight,
   FileUp,
   Loader2,
-  Check,
-  Edit2
+  WalletCards,
+  Calendar,
+  Sparkles,
+  TrendingUp,
+  X,
+  CreditCard,
+  DollarSign
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { CategoryBadge } from '@/components/ui/category-badge'
 import { api } from '@/lib/api-client'
 import { Transaction, TransactionDirection } from '@/lib/types'
 
 const CATEGORIES = [
   'All',
-  'Groceries',
   'Dining',
+  'Groceries',
   'Retail',
   'Entertainment',
   'Travel',
@@ -51,6 +56,7 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
   const [totalSpending, setTotalSpending] = useState(0)
   const [totalIncome, setTotalIncome] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [direction, setDirection] = useState<'all' | 'spending' | 'income'>('all')
@@ -92,11 +98,27 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
     loadTransactions()
   }, [loadTransactions])
 
+  const handleSeed = async () => {
+    setSeeding(true)
+    try {
+      await api.seedDemoData('default_user')
+      await loadTransactions()
+    } catch (err) {
+      console.error('Failed to seed demo data', err)
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   const handleCategoryOverride = async (txId: string, newCategory: string) => {
     try {
       await api.updateTransaction(txId, { category: newCategory })
       setTransactions((prev) =>
-        prev.map((t) => (t.id === txId ? { ...t, category: newCategory, category_source: 'user_override' } : t))
+        prev.map((t) =>
+          t.id === txId
+            ? { ...t, category: newCategory, category_source: 'user_override' }
+            : t
+        )
       )
     } catch (err) {
       console.error('Failed to override category', err)
@@ -104,7 +126,7 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
   }
 
   const handleDelete = async (txId: string) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) return
+    if (!confirm('Are you sure you want to delete this transaction from the verified ledger?')) return
     try {
       await api.deleteTransaction(txId)
       loadTransactions()
@@ -137,82 +159,161 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
     }
   }
 
+  const netCashFlow = useMemo(() => {
+    return totalIncome - totalSpending
+  }, [totalIncome, totalSpending])
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Top Banner Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-medium text-muted-foreground">Total Transactions</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight">{total}</p>
+      {/* Top Banner Stats with Glass Panels & Icon Badges */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Ledger Entries */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-primary/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Ledger Entries
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-500">
+              <WalletCards className="size-4" />
+            </div>
+          </div>
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground">{total}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Verified transactions on record</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-medium text-rose-600 dark:text-rose-400">Total Spending</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-rose-600 dark:text-rose-400">
-            ₹{totalSpending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+
+        {/* Total Spending */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-rose-500/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+              Total Spending
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-500">
+              <ArrowDownLeft className="size-4" />
+            </div>
+          </div>
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-rose-600 dark:text-rose-400">
+            ₹{totalSpending.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">Debits & categorized expenses</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Total Income</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-            ₹{totalIncome.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+
+        {/* Total Income */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-emerald-500/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Total Income
+            </span>
+            <div className="flex size-9 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
+              <ArrowUpRight className="size-4" />
+            </div>
+          </div>
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
+            ₹{totalIncome.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Credits, salary & refunds</p>
+        </div>
+
+        {/* Net Cash Flow */}
+        <div className="glass-panel group relative overflow-hidden rounded-2xl border border-border p-5 shadow-xs transition hover:border-indigo-500/40 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Net Cash Flow
+            </span>
+            <div
+              className={`flex size-9 items-center justify-center rounded-xl border ${
+                netCashFlow >= 0
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
+                  : 'border-rose-500/20 bg-rose-500/10 text-rose-500'
+              }`}
+            >
+              <TrendingUp className="size-4" />
+            </div>
+          </div>
+          <p
+            className={`mt-3 text-3xl font-extrabold tracking-tight ${
+              netCashFlow >= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-rose-600 dark:text-rose-400'
+            }`}
+          >
+            {netCashFlow >= 0 ? '+' : ''}₹
+            {netCashFlow.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {netCashFlow >= 0 ? 'Net surplus retained' : 'Deficit in active window'}
           </p>
         </div>
       </div>
 
-      {/* Controls Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
+      {/* Controls & Filter Bar */}
+      <div className="glass-panel flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search */}
-          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search merchant or category..."
+              placeholder="Search merchant, ID, or description..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
                 setPage(0)
               }}
-              className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
+              className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-8 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Category Filter */}
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value)
-              setPage(0)
-            }}
-            className="h-9 rounded-lg border border-border bg-background px-3 text-xs font-medium text-muted-foreground focus:border-primary focus:outline-none"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value)
+                setPage(0)
+              }}
+              className="h-10 rounded-xl border border-border bg-background px-3.5 pr-8 text-xs font-semibold text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c === 'All' ? 'All Categories' : c}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {/* Direction Filter */}
-          <div className="flex rounded-lg border border-border bg-muted/40 p-0.5 text-xs font-medium">
+          {/* Direction Filter Segmented Control */}
+          <div className="flex rounded-xl border border-border bg-muted/40 p-1 text-xs font-medium">
             <button
               onClick={() => {
                 setDirection('all')
                 setPage(0)
               }}
-              className={`rounded-md px-2.5 py-1 ${
-                direction === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+              className={`rounded-lg px-3 py-1.5 transition ${
+                direction === 'all'
+                  ? 'bg-background font-semibold text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              All
+              All Types
             </button>
             <button
               onClick={() => {
                 setDirection('spending')
                 setPage(0)
               }}
-              className={`rounded-md px-2.5 py-1 ${
-                direction === 'spending' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+              className={`rounded-lg px-3 py-1.5 transition ${
+                direction === 'spending'
+                  ? 'bg-background font-semibold text-rose-600 dark:text-rose-400 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Expenses
@@ -222,8 +323,10 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
                 setDirection('income')
                 setPage(0)
               }}
-              className={`rounded-md px-2.5 py-1 ${
-                direction === 'income' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+              className={`rounded-lg px-3 py-1.5 transition ${
+                direction === 'income'
+                  ? 'bg-background font-semibold text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Income
@@ -231,102 +334,135 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowAddModal(true)} className="gap-1.5">
-            <Plus className="size-3.5" /> Add Manual
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddModal(true)}
+            className="gap-1.5 rounded-xl text-xs font-semibold"
+          >
+            <Plus className="size-3.5 text-primary" /> Add Transaction
           </Button>
-          <Button size="sm" onClick={onOpenImport} className="gap-1.5">
-            <FileUp className="size-3.5" /> Import CSV
+          <Button
+            size="sm"
+            onClick={onOpenImport}
+            className="gap-1.5 rounded-xl text-xs font-semibold shadow-xs"
+          >
+            <FileUp className="size-3.5" /> Import Statement
           </Button>
         </div>
       </div>
 
-      {/* Transactions Table */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Transactions Table Card */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
         {loading ? (
-          <div className="flex flex-col items-center justify-center p-16 text-muted-foreground">
+          <div className="flex flex-col items-center justify-center p-20 text-muted-foreground">
             <Loader2 className="size-8 animate-spin text-primary" />
-            <p className="mt-3 text-sm">Loading transactions...</p>
+            <p className="mt-3 text-sm font-medium">Fetching verified ledger receipts...</p>
           </div>
         ) : transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-              <FileUp className="size-6" />
+            <div className="flex size-14 items-center justify-center rounded-2xl border border-border bg-muted/40 text-muted-foreground shadow-xs">
+              <FileUp className="size-7" />
             </div>
-            <h3 className="mt-4 text-base font-semibold">No transactions found</h3>
-            <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+            <h3 className="mt-4 text-lg font-bold tracking-tight">No ledger transactions found</h3>
+            <p className="mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
               {search || category !== 'All' || direction !== 'all'
-                ? 'Try adjusting your filters or search terms.'
-                : 'Import a CSV statement or add your first transaction above to get started.'}
+                ? 'No transactions matched your active query. Try clearing filters or searching another keyword.'
+                : 'Your database has zero recorded transactions. Seed the demo dataset or import a CSV statement to unlock deterministic financial analytics.'}
             </p>
-            <Button size="sm" onClick={onOpenImport} className="mt-5 gap-2">
-              <FileUp className="size-4" /> Import CSV
-            </Button>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSeed}
+                disabled={seeding}
+                className="gap-2 rounded-xl text-xs"
+              >
+                {seeding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5 text-primary" />}
+                Load Demo Ledger (Jordan Davis)
+              </Button>
+              <Button size="sm" onClick={onOpenImport} className="gap-2 rounded-xl text-xs">
+                <FileUp className="size-3.5" /> Import CSV Statement
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-muted/30 text-xs text-muted-foreground">
+              <thead className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Date</th>
-                  <th className="px-5 py-3 font-medium">Merchant / Description</th>
-                  <th className="px-5 py-3 font-medium">Category (Click to Override)</th>
-                  <th className="px-5 py-3 text-right font-medium">Amount</th>
-                  <th className="px-5 py-3 text-right font-medium">Actions</th>
+                  <th className="px-5 py-3.5">Date</th>
+                  <th className="px-5 py-3.5">Merchant / Description</th>
+                  <th className="px-5 py-3.5">Category (Click to Override)</th>
+                  <th className="px-5 py-3.5 text-right">Amount</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="transition hover:bg-muted/20">
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {tx.transaction_date}
-                    </td>
-                    <td className="px-5 py-3.5 font-medium">{tx.description}</td>
-                    <td className="px-5 py-3.5">
-                      <select
-                        value={tx.category}
-                        onChange={(e) => handleCategoryOverride(tx.id, e.target.value)}
-                        className={`rounded-md border border-border bg-background px-2 py-1 text-xs font-medium focus:border-primary focus:outline-none ${
-                          tx.category_source === 'user_override'
-                            ? 'border-primary/50 text-primary'
+                {transactions.map((tx) => {
+                  const isIncome = tx.direction === 'income'
+                  return (
+                    <tr
+                      key={tx.id}
+                      className="group transition hover:bg-muted/30"
+                    >
+                      {/* Date */}
+                      <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap font-mono">
+                        {tx.transaction_date}
+                      </td>
+
+                      {/* Description & ID */}
+                      <td className="px-5 py-3.5">
+                        <div className="font-semibold text-foreground tracking-tight">
+                          {tx.description}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-mono">
+                          ID: {tx.id.slice(0, 14)}
+                        </div>
+                      </td>
+
+                      {/* Category Badge with interactive selector */}
+                      <td className="px-5 py-3.5">
+                        <CategoryBadge
+                          category={tx.category}
+                          isOverride={tx.category_source === 'user_override'}
+                          categoriesList={CATEGORIES}
+                          onSelectCategory={(newCat) => handleCategoryOverride(tx.id, newCat)}
+                        />
+                      </td>
+
+                      {/* Amount */}
+                      <td
+                        className={`px-5 py-3.5 text-right font-bold text-sm tracking-tight whitespace-nowrap font-mono ${
+                          isIncome
+                            ? 'text-emerald-600 dark:text-emerald-400'
                             : 'text-foreground'
                         }`}
-                        title={
-                          tx.category_source === 'user_override'
-                            ? 'User-overridden category'
-                            : 'Auto-categorized'
-                        }
                       >
-                        {CATEGORIES.filter((c) => c !== 'All').map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td
-                      className={`px-5 py-3.5 text-right font-semibold whitespace-nowrap ${
-                        tx.direction === 'income'
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-foreground'
-                      }`}
-                    >
-                      {tx.direction === 'income' ? '+' : '-'}₹
-                      {tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-muted-foreground hover:text-rose-600"
-                        onClick={() => handleDelete(tx.id)}
-                        aria-label="Delete transaction"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                        {isIncome ? '+' : '-'}₹
+                        {tx.amount.toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-3.5 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 rounded-lg text-muted-foreground opacity-60 transition hover:bg-rose-500/10 hover:text-rose-600 hover:opacity-100 dark:hover:bg-rose-500/20"
+                          onClick={() => handleDelete(tx.id)}
+                          aria-label={`Delete transaction ${tx.description}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -334,29 +470,34 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
 
         {/* Pagination Bar */}
         {total > limit && (
-          <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between border-t border-border px-5 py-3.5 text-xs text-muted-foreground bg-muted/10">
             <span>
-              Showing {page * limit + 1} to {Math.min((page + 1) * limit, total)} of {total} records
+              Showing <strong>{page * limit + 1}</strong> to{' '}
+              <strong>{Math.min((page + 1) * limit, total)}</strong> of <strong>{total}</strong> verified records
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="icon"
-                className="size-7"
+                className="size-8 rounded-lg"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
+                aria-label="Previous page"
               >
-                <ChevronLeft className="size-3.5" />
+                <ChevronLeft className="size-4" />
               </Button>
-              <span className="px-2 font-medium">Page {page + 1}</span>
+              <span className="px-2.5 font-semibold text-foreground">
+                Page {page + 1} of {Math.ceil(total / limit)}
+              </span>
               <Button
                 variant="outline"
                 size="icon"
-                className="size-7"
+                className="size-8 rounded-lg"
                 disabled={(page + 1) * limit >= total}
                 onClick={() => setPage((p) => p + 1)}
+                aria-label="Next page"
               >
-                <ChevronRight className="size-3.5" />
+                <ChevronRight className="size-4" />
               </Button>
             </div>
           </div>
@@ -371,75 +512,85 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="manual-add-title"
-            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95"
           >
             <div className="flex items-center justify-between border-b border-border pb-4">
-              <h3 id="manual-add-title" className="font-semibold">
-                Add Transaction
-              </h3>
+              <div>
+                <h3 id="manual-add-title" className="text-base font-bold tracking-tight">
+                  Add Transaction
+                </h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Commit a verified ledger receipt for financial math auditing.
+                </p>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
                 type="button"
+                className="size-8 rounded-lg"
                 onClick={() => setShowAddModal(false)}
                 aria-label="Close"
               >
-                ✕
+                <X className="size-4" />
               </Button>
             </div>
-            <div className="mt-4 flex flex-col gap-3 text-xs">
+
+            <div className="mt-5 flex flex-col gap-4 text-xs">
               <div>
-                <label className="mb-1 block font-medium text-muted-foreground">Date</label>
+                <label className="mb-1.5 block font-semibold text-foreground">Transaction Date</label>
                 <input
                   type="date"
                   value={addDate}
                   onChange={(e) => setAddDate(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                   required
                 />
               </div>
+
               <div>
-                <label className="mb-1 block font-medium text-muted-foreground">Merchant / Description</label>
+                <label className="mb-1.5 block font-semibold text-foreground">Merchant / Description</label>
                 <input
                   type="text"
-                  placeholder="e.g. Swiggy, Uber, Rent"
+                  placeholder="e.g. Swiggy Gourmet, Netflix, TechCorp Salary"
                   value={addDesc}
                   onChange={(e) => setAddDesc(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                   required
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block font-medium text-muted-foreground">Amount (₹)</label>
+                  <label className="mb-1.5 block font-semibold text-foreground">Amount (₹)</label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     value={addAmount}
                     onChange={(e) => setAddAmount(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none"
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-mono font-bold focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                     required
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-muted-foreground">Type</label>
+                  <label className="mb-1.5 block font-semibold text-foreground">Transaction Type</label>
                   <select
                     value={addDir}
                     onChange={(e) => setAddDir(e.target.value as TransactionDirection)}
-                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none"
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                   >
-                    <option value="spending">Expense</option>
-                    <option value="income">Income</option>
+                    <option value="spending">Expense (Debit)</option>
+                    <option value="income">Income (Credit)</option>
                   </select>
                 </div>
               </div>
+
               <div>
-                <label className="mb-1 block font-medium text-muted-foreground">Category</label>
+                <label className="mb-1.5 block font-semibold text-foreground">Category Taxonomy</label>
                 <select
                   value={addCat}
                   onChange={(e) => setAddCat(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
                 >
                   {CATEGORIES.filter((c) => c !== 'All').map((c) => (
                     <option key={c} value={c}>
@@ -449,12 +600,24 @@ export function TransactionsView({ onOpenImport }: TransactionsViewProps) {
                 </select>
               </div>
             </div>
-            <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
+
+            <div className="mt-6 flex justify-end gap-2.5 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setShowAddModal(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={adding}>
-                {adding ? 'Saving...' : 'Add Transaction'}
+              <Button type="submit" disabled={adding} className="rounded-xl gap-2 font-semibold">
+                {adding ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> Recording...
+                  </>
+                ) : (
+                  'Commit Transaction'
+                )}
               </Button>
             </div>
           </form>
