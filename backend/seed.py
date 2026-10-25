@@ -181,7 +181,7 @@ def seed_demo_data(conn):
             "Reduce discretionary dining by 25% to recover monthly surplus.",
             "{\"threshold\": 0.25, \"recent_spending\": 18350.0, \"target_reduction\": 4587.50}",
             4587.50,
-            "Based on deterministic 25% threshold rule against top discretionary spending category.",
+            json.dumps(["Based on deterministic 25% threshold rule against top discretionary spending category."]),
             1,
             "Deterministic Rule Engine passed: valid category and non-protected tier."
         ),
@@ -193,7 +193,7 @@ def seed_demo_data(conn):
             "Reallocate ₹3,500 of monthly eating-out spend toward the Kyoto Autumn Retreat travel goal.",
             "{\"profile_delta\": 14.8, \"goal_id\": \"goal_travel_01\", \"reallocation_amount\": 3500.0}",
             3500.0,
-            "Conditioned on spending profile pace and current progress toward Kyoto travel goal.",
+            json.dumps(["Conditioned on spending profile pace and current progress toward Kyoto travel goal."]),
             1,
             "Personalized AI insight aligned with user discretionary preferences."
         ),
@@ -205,7 +205,7 @@ def seed_demo_data(conn):
             "Try cooking at home more often instead of ordering takeout on weekends.",
             "{}",
             2500.0,
-            "General heuristic recommendation without itemized transaction anchoring.",
+            json.dumps(["General heuristic recommendation without itemized transaction anchoring."]),
             0,
             "Ablation baseline: Unstructured heuristic without empirical evidence."
         ),
@@ -217,7 +217,7 @@ def seed_demo_data(conn):
             "Cut 3 high-spend weekend dinner bistro outings across the next cycle to free up ₹4,200.00/month for your emergency buffer.",
             "{\"category\": \"Dining\", \"monthly_impact\": 4200.00, \"expected_impact\": 4200.00, \"source_transaction_ids\": [\"" + created_tx_ids[-2] + "\", \"" + created_tx_ids[-4] + "\", \"" + created_tx_ids[-6] + "\"]}",
             4200.00,
-            "Grounding confirmed against exact source receipts. Protected categories (Housing, Healthcare) untouched.",
+            json.dumps(["Grounding confirmed against exact source receipts. Protected categories (Housing, Healthcare) untouched."]),
             1,
             "Strict Numeric Claim Verifier passed: Claimed ₹4,200.00 matches underlying itemized receipts within 1.5% margin."
         ),

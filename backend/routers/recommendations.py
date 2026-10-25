@@ -71,6 +71,28 @@ def list_recommendations(user_id: str = "default_user", db=Depends(get_db)):
 
     results = []
     for r in rows:
+        assumptions_val = []
+        raw_asm = r["assumptions"]
+        if raw_asm:
+            try:
+                parsed = json.loads(raw_asm)
+                if isinstance(parsed, list):
+                    assumptions_val = [str(x) for x in parsed]
+                elif isinstance(parsed, str):
+                    assumptions_val = [parsed]
+            except Exception:
+                assumptions_val = [str(raw_asm)]
+
+        ev_val = {}
+        raw_ev = r["evidence_json"]
+        if raw_ev:
+            try:
+                parsed_ev = json.loads(raw_ev)
+                if isinstance(parsed_ev, dict):
+                    ev_val = parsed_ev
+            except Exception:
+                ev_val = {}
+
         results.append(RecommendationRead(
             id=r["id"],
             user_id=r["user_id"],
@@ -78,9 +100,9 @@ def list_recommendations(user_id: str = "default_user", db=Depends(get_db)):
             category=r["category"],
             action=r["action"],
             reason=r["reason"],
-            evidence=json.loads(r["evidence_json"] or "{}"),
+            evidence=ev_val,
             expected_impact=float(r["expected_impact"]) if r["expected_impact"] is not None else None,
-            assumptions=json.loads(r["assumptions"] or "[]"),
+            assumptions=assumptions_val,
             is_verified=bool(r["is_verified"]),
             verifier_notes=r["verifier_notes"],
             created_at=r["created_at"]
@@ -95,7 +117,15 @@ def inspect_recommendation_evidence(rec_id: str, user_id: str = "default_user", 
     if not row:
         raise HTTPException(status_code=404, detail="Recommendation not found.")
 
-    evidence = json.loads(row["evidence_json"] or "{}")
+    evidence = {}
+    raw_ev = row["evidence_json"]
+    if raw_ev:
+        try:
+            parsed_ev = json.loads(raw_ev)
+            if isinstance(parsed_ev, dict):
+                evidence = parsed_ev
+        except Exception:
+            evidence = {}
     source_ids = evidence.get("source_transaction_ids", [])
     source_txs = []
     if source_ids:
