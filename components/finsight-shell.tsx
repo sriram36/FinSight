@@ -372,25 +372,49 @@ export function FinSightShell() {
         </div>
 
         {/* User profile avatar / Account switcher */}
-        <div
-          onClick={() => setShowAuthModal(true)}
-          className="mt-4 flex items-center justify-between border-t border-border px-1 pt-4 cursor-pointer hover:opacity-85 transition"
-        >
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="mt-4 flex items-center justify-between border-t border-border px-1 pt-4">
+          <div
+            onClick={() => setShowAuthModal(true)}
+            className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-85 transition flex-1"
+          >
             <div className="relative">
               <div className="flex size-9 items-center justify-center rounded-xl bg-primary/20 text-xs font-bold text-primary">
                 {initials}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card bg-emerald-500" />
+              <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card ${currentUser.is_demo ? 'bg-amber-500' : 'bg-emerald-500'}`} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-bold">{currentUser.name}</p>
               <p className="truncate text-[11px] text-muted-foreground">
-                {currentUser.is_demo ? 'Demo Sandbox' : 'Authenticated User'}
+                {currentUser.is_demo ? 'Demo Sandbox' : 'Authenticated'}
               </p>
             </div>
           </div>
-          <ChevronDown className="size-4 text-muted-foreground" />
+          {!currentUser.is_demo ? (
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('finsight_token')
+                  localStorage.removeItem('finsight_user')
+                }
+                setCurrentUser({
+                  id: 'default_user',
+                  name: 'Jordan Davis',
+                  email: 'jordan@finsight.local',
+                  token: 'tok_demo_jordan_sandbox',
+                  is_demo: true,
+                })
+              }}
+              title="Sign out to demo sandbox"
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition cursor-pointer"
+            >
+              <LogOut className="size-4" />
+            </button>
+          ) : (
+            <div onClick={() => setShowAuthModal(true)} className="cursor-pointer p-1.5 text-muted-foreground hover:text-foreground">
+              <ChevronDown className="size-4" />
+            </div>
+          )}
         </div>
       </aside>
 

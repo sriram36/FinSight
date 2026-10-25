@@ -14,7 +14,9 @@ services:
       - key: CORS_ORIGINS
         value: "https://finsight-wine-tau.vercel.app,http://localhost:3000"
       - key: DATABASE_URL
-        value: ""
+        fromDatabase:
+          name: finsight-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: AZURE_OPENAI_ENDPOINT
@@ -25,3 +27,9 @@ services:
         value: "gpt-5.6-luna"
       - key: AZURE_OPENAI_API_VERSION
         value: "2024-02-15-preview"
+
+databases:
+  - name: finsight-db
+    plan: free
+    databaseName: finsight
+    user: finsight

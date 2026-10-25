@@ -71,3 +71,87 @@ def test_demo_user_auth(client):
     assert res.status_code == 200
     assert res.json()["id"] == "default_user"
     assert "token" in res.json()
+
+def test_cross_user_data_isolation(client):
+    """
+    Verifies strict multi-tenant boundary enforcement:
+    A user cannot read, mutate, or access another user's financial records.
+    """
+    # 1. Register Alice
+    res_alice = client.post("/auth/register", json={
+        "name": "Alice Tester",
+        "email": "alice@finsight.test",
+        "password": "PasswordAlice123!"
+    })
+    assert res_alice.status_code == 200
+    alice = res_alice.json()
+    alice_headers = {"Authorization": f"Bearer {alice['token']}"}
+
+    # 2. Register Bob
+    res_bob = client.post("/auth/register", json={
+        "name": "Bob Tester",
+        "email": "bob@finsight.test",
+        "password": "PasswordBob123!"
+    })
+    assert res_bob.status_code == 200
+    bob = res_bob.json()
+    bob_headers = {"Authorization": f"Bearer {bob['token']}"}
+
+    # 3. Alice creates a private transaction
+    create_res = client.post("/transactions", json={
+        "user_id": alice["id"],
+        "description": "Alice Confidential Medical",
+        "amount": 450.0,
+        "direction": "spending",
+        "category": "Healthcare",
+        "transaction_date": "2026-10-15"
+    }, headers=alice_headers)
+    assert create_res.status_code == 201
+    tx_id = create_res.json()["id"]
+
+    # Alice can read her own transaction
+    alice_txs = client.get("/transactions", headers=alice_headers)
+    assert alice_txs.status_code == 200
+    assert any(t["id"] == tx_id for t in alice_txs.json()["items"])
+
+    # 4. Bob attempts to read Alice's transactions explicitly -> 403 Forbidden
+    bob_snoop = client.get(f"/transactions?user_id={alice['id']}", headers=bob_headers)
+    assert bob_snoop.status_code == 403
+
+    # 5. Bob reads his own transactions -> Alice's transaction is not there
+    bob_own_txs = client.get("/transactions", headers=bob_headers)
+    assert bob_own_txs.status_code == 200
+    assert len(bob_own_txs.json()["items"]) == 0
+
+    # 6. Bob attempts to delete Alice's transaction -> 403 Forbidden
+    bob_delete = client.delete(f"/transactions/{tx_id}?user_id={alice['id']}", headers=bob_headers)
+    assert bob_delete.status_code == 403
+
+    # 7. Bob attempts to access Alice's budgets -> 403 Forbidden
+    bob_budgets = client.get(f"/budgets?user_id={alice['id']}", headers=bob_headers)
+    assert bob_budgets.status_code == 403
+
+    # 8. Bob attempts to access Alice's goals -> 403 Forbidden
+    bob_goals = client.get(f"/goals?user_id={alice['id']}", headers=bob_headers)
+    assert bob_goals.status_code == 403
+
+    # 9. Bob attempts to query chat copilot as Alice -> 403 Forbidden
+    bob_chat = client.post("/chat/query", json={
+        "user_id": alice["id"],
+        "message": "What did I spend on healthcare?"
+    }, headers=bob_headers)
+    assert bob_chat.status_code == 403
+
+def test_jwt_secret_production_enforcement(monkeypatch):
+    """
+    Verifies that get_jwt_secret refuses to use fallback in production.
+    """
+    from backend.security import get_jwt_secret
+    
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    monkeypatch.setenv("APP_ENV", "production")
+    
+    with pytest.raises(RuntimeError) as exc_info:
+        get_jwt_secret()
+    assert "FATAL CONFIGURATION ERROR: JWT_SECRET environment variable is missing" in str(exc_info.value)
+

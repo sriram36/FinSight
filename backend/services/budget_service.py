@@ -37,33 +37,63 @@ def get_user_budgets(user_id: str, month: Optional[str], db) -> List[Dict[str, A
         start_date = now.strftime("%Y-%m-01")
         end_date = now.strftime("%Y-%m-30")
 
+    # Enforce override rule: month-specific budgets override 'default' limits
+    cat_budget_map: Dict[str, Any] = {}
+    for r in rows:
+        cat = r["category"]
+        if cat not in cat_budget_map:
+            cat_budget_map[cat] = r
+        elif r["month"] == target_month and cat_budget_map[cat]["month"] == "default":
+            cat_budget_map[cat] = r
+    effective_rows = list(cat_budget_map.values())
+
+    # Date-aware elapsed days and projection handling
     now = datetime.now(timezone.utc)
-    current_day = min(num_days, max(1, now.day))
+    current_month_str = now.strftime("%Y-%m")
+    if target_month < current_month_str:
+        # Completed historical month: all days have elapsed, projected spend is actual spent
+        days_elapsed = num_days
+    elif target_month > current_month_str:
+        # Future month: 0 days elapsed
+        days_elapsed = 0
+    else:
+        # Active month in progress
+        days_elapsed = min(num_days, max(1, now.day))
 
     budgets_list = []
-    for r in rows:
+    for r in effective_rows:
         b_id = r["id"]
         cat = r["category"]
         limit = float(r["monthly_limit"])
 
-        # Calculate actual spending in this category for this month
+        # Calculate net spending in this category (spending minus refunds)
         cursor.execute("""
-        SELECT SUM(amount) AS spent_amt, COUNT(*) AS tx_cnt
+        SELECT 
+            SUM(CASE WHEN direction = 'spending' OR direction = 'debit' THEN amount
+                     WHEN direction = 'refund' THEN -amount
+                     ELSE 0 END) AS spent_amt,
+            COUNT(*) AS tx_cnt
         FROM transactions
         WHERE user_id = ? AND category = ? 
-          AND (direction = 'spending' OR direction = 'debit')
+          AND (direction = 'spending' OR direction = 'debit' OR direction = 'refund')
           AND transaction_date >= ? AND transaction_date <= ?
         """, (user_id, cat, start_date, end_date))
         spent_row = cursor.fetchone()
-        spent = round(float(spent_row["spent_amt"] or 0.0), 2)
-        tx_count = int(spent_row["tx_cnt"] or 0)
+        raw_spent = float(spent_row["spent_amt"] or 0.0) if spent_row else 0.0
+        spent = round(max(0.0, raw_spent), 2)
+        tx_count = int(spent_row["tx_cnt"] or 0) if spent_row else 0
 
         remaining = round(limit - spent, 2)
         pct = round((spent / limit * 100.0), 1) if limit > 0 else 0.0
 
         # Pace projection
-        burn_rate_daily = spent / current_day
-        projected = round(burn_rate_daily * num_days, 2)
+        if target_month < current_month_str:
+            projected = spent
+        elif target_month > current_month_str:
+            projected = 0.0
+        else:
+            burn_rate_daily = spent / max(1, days_elapsed)
+            projected = round(burn_rate_daily * num_days, 2)
 
         if spent > limit:
             status = "exceeded"
@@ -86,7 +116,7 @@ def get_user_budgets(user_id: str, month: Optional[str], db) -> List[Dict[str, A
             "projected_spend": projected,
             "transaction_count": tx_count,
             "status": status,
-            "days_elapsed": current_day,
+            "days_elapsed": days_elapsed,
             "total_days_in_month": num_days
         })
 

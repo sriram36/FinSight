@@ -10,7 +10,22 @@ from datetime import datetime, timezone, timedelta
 from fastapi import Header, HTTPException, status, Depends
 from backend.database import get_db
 
-JWT_SECRET = os.getenv("JWT_SECRET", "finsight_sec_jwt_signing_key_2026_production")
+def get_jwt_secret() -> str:
+    """
+    Retrieves the JWT signing secret from environment.
+    Strictly forbids insecure fallbacks in production or live cloud environments.
+    """
+    secret = os.getenv("JWT_SECRET")
+    if not secret:
+        app_env = os.getenv("APP_ENV", "development").lower()
+        if app_env in ("production", "prod") or (os.getenv("RENDER") and not os.getenv("TESTING")):
+            raise RuntimeError(
+                "FATAL CONFIGURATION ERROR: JWT_SECRET environment variable is missing in production environment. "
+                "Application refused to start with an insecure default signing secret."
+            )
+        return "finsight_dev_test_signing_key_not_for_production_only"
+    return secret
+
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 72
 
@@ -51,7 +66,7 @@ def create_access_token(user_id: str, email: str, expires_delta: Optional[timede
     payload_b64 = _b64url_encode(json.dumps(payload, separators=(',', ':')).encode('utf-8'))
     
     signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
-    signature = hmac.new(JWT_SECRET.encode('utf-8'), signing_input, hashlib.sha256).digest()
+    signature = hmac.new(get_jwt_secret().encode('utf-8'), signing_input, hashlib.sha256).digest()
     sig_b64 = _b64url_encode(signature)
     
     return f"{header_b64}.{payload_b64}.{sig_b64}"
@@ -68,7 +83,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
     
     # Verify signature
     signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
-    expected_sig = hmac.new(JWT_SECRET.encode('utf-8'), signing_input, hashlib.sha256).digest()
+    expected_sig = hmac.new(get_jwt_secret().encode('utf-8'), signing_input, hashlib.sha256).digest()
     actual_sig = _b64url_decode(sig_b64)
     
     if not hmac.compare_digest(expected_sig, actual_sig):
@@ -141,8 +156,13 @@ def verify_user_access(current_user: Dict[str, Any], requested_user_id: Optional
     if not caller_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthenticated.")
     
+    # If caller is an authenticated user, but requested_user_id was omitted or defaulted to 'default_user',
+    # safely scope to their own account.
+    if requested_user_id in (None, "", "default_user") and caller_id != "default_user":
+        return caller_id
+    
     if requested_user_id and requested_user_id != caller_id:
-        # If demo user requests demo, ok. If authenticated user requests someone else's data, strictly reject.
+        # If demo user requests someone else's data, or authenticated user requests someone else's data, strictly reject.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied: You do not have permission to access user '{requested_user_id}' data."

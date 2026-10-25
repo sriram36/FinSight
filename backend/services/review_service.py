@@ -1,3 +1,4 @@
+import calendar
 from datetime import datetime, date, timedelta
 from typing import Dict, Any, List, Optional
 from collections import defaultdict
@@ -8,13 +9,19 @@ from backend.services.anomaly_service import get_user_anomalies
 def generate_monthly_review(user_id: str, month_str: Optional[str], db) -> Dict[str, Any]:
     """
     Generates a deterministic financial review for the selected calendar month (YYYY-MM).
-    Compares metrics against the previous calendar month.
+    Compares metrics against the previous calendar month with explicit handling for partial months
+    and missing historical baseline data.
     """
     now = date.today()
     if not month_str or len(month_str) != 7 or "-" not in month_str:
         month_str = now.strftime("%Y-%m")
         
     year, month = int(month_str[:4]), int(month_str[5:7])
+    days_in_month = calendar.monthrange(year, month)[1]
+    
+    current_calendar_month = now.strftime("%Y-%m")
+    is_partial_month = (month_str == current_calendar_month)
+    days_elapsed = min(now.day, days_in_month) if is_partial_month else days_in_month
     
     # Calculate previous month string
     if month == 1:
@@ -48,6 +55,7 @@ def generate_monthly_review(user_id: str, month_str: Optional[str], db) -> Dict[
     
     prev_income = sum(float(t["amount"]) for t in prev_txs if t["direction"] == "income")
     prev_spending = sum(float(t["amount"]) for t in prev_txs if t["direction"] == "spending")
+    has_prior_data = len(prev_txs) > 0
     
     savings_rate = round((curr_net / curr_income) * 100.0, 1) if curr_income > 0 else 0.0
     
@@ -91,18 +99,22 @@ def generate_monthly_review(user_id: str, month_str: Optional[str], db) -> Dict[
     
     # Deterministic Narrative
     diff_total_spend = round(curr_spending - prev_spending, 2)
-    spend_trend_str = (
-        f"increased by ₹{abs(diff_total_spend):,.2f} compared to {prev_month_str}"
-        if diff_total_spend > 0
-        else (f"decreased by ₹{abs(diff_total_spend):,.2f} compared to {prev_month_str}" if diff_total_spend < 0 else "remained flat")
-    )
+    if not has_prior_data:
+        spend_trend_str = f"stands at ₹{curr_spending:,.2f} (first recorded period with no prior baseline)"
+    elif diff_total_spend > 0:
+        spend_trend_str = f"increased by ₹{abs(diff_total_spend):,.2f} compared to {prev_month_str}"
+    elif diff_total_spend < 0:
+        spend_trend_str = f"decreased by ₹{abs(diff_total_spend):,.2f} compared to {prev_month_str}"
+    else:
+        spend_trend_str = "remained flat compared to previous month"
     
     top_cat = category_comparisons[0]["category"] if category_comparisons else "General"
     top_cat_amt = category_comparisons[0]["current_spend"] if category_comparisons else 0.0
     
+    progress_prefix = f"Through day {days_elapsed} of {month_str} (month in progress)" if is_partial_month else f"In {month_str}"
     narrative = (
-        f"In {month_str}, you recorded ₹{curr_income:,.2f} in total income and ₹{curr_spending:,.2f} in expenses, "
-        f"yielding a net savings of ₹{curr_net:,.2f} (savings rate of {savings_rate}%). "
+        f"{progress_prefix}, you recorded ₹{curr_income:,.2f} in total income and ₹{curr_spending:,.2f} in expenses, "
+        f"yielding a net cash flow of ₹{curr_net:,.2f} (savings rate of {savings_rate}%). "
         f"Your total spending {spend_trend_str}. "
         f"Your largest spending driver was {top_cat} at ₹{top_cat_amt:,.2f}. "
     )
@@ -114,6 +126,10 @@ def generate_monthly_review(user_id: str, month_str: Optional[str], db) -> Dict[
     return {
         "month": month_str,
         "previous_month": prev_month_str,
+        "is_partial_month": is_partial_month,
+        "days_elapsed": days_elapsed,
+        "days_in_month": days_in_month,
+        "has_prior_month_data": has_prior_data,
         "total_income": round(curr_income, 2),
         "total_spending": round(curr_spending, 2),
         "net_cash_flow": curr_net,

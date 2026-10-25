@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import uuid
 from datetime import datetime, timezone
 from backend.database import get_db
+from backend.security import get_current_user, verify_user_access
 from backend.schemas.transaction import (
     TransactionCreate,
     TransactionRead,
@@ -13,7 +14,12 @@ from backend.schemas.transaction import (
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
-def create_transaction(tx: TransactionCreate, db=Depends(get_db)):
+def create_transaction(
+    tx: TransactionCreate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, tx.user_id)
     tx_id = f"tx_{uuid.uuid4().hex[:12]}"
     now_iso = datetime.now(timezone.utc).isoformat()
     cursor = db.cursor()
@@ -24,7 +30,7 @@ def create_transaction(tx: TransactionCreate, db=Depends(get_db)):
         category, category_source, raw_data, import_id, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        tx_id, tx.user_id, tx.transaction_date, tx.description,
+        tx_id, target_user_id, tx.transaction_date, tx.description,
         tx.amount, tx.direction.value, tx.category, tx.category_source,
         tx.raw_data, tx.import_id, now_iso
     ))
@@ -36,7 +42,7 @@ def create_transaction(tx: TransactionCreate, db=Depends(get_db)):
 
 @router.get("")
 def list_transactions(
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     category: Optional[str] = None,
@@ -44,11 +50,13 @@ def list_transactions(
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
     where_clauses = ["user_id = ?"]
-    params = [user_id]
+    params = [target_user_id]
 
     if start_date:
         where_clauses.append("transaction_date >= ?")
@@ -96,7 +104,6 @@ def list_transactions(
     )
     rows = cursor.fetchall()
 
-
     return {
         "items": [dict(r) for r in rows],
         "total": total_count,
@@ -110,11 +117,13 @@ def list_transactions(
 def update_transaction(
     tx_id: str,
     update_data: TransactionUpdate,
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM transactions WHERE id = ? AND user_id = ?", (tx_id, user_id))
+    cursor.execute("SELECT * FROM transactions WHERE id = ? AND user_id = ?", (tx_id, target_user_id))
     existing = cursor.fetchone()
     if not existing:
         raise HTTPException(status_code=404, detail="Transaction not found or unauthorized.")
@@ -143,7 +152,7 @@ def update_transaction(
         return dict(existing)
 
     query = f"UPDATE transactions SET {', '.join(updates)} WHERE id = ? AND user_id = ?"
-    params.extend([tx_id, user_id])
+    params.extend([tx_id, target_user_id])
     cursor.execute(query, params)
     db.commit()
 
@@ -154,24 +163,28 @@ def update_transaction(
 @router.delete("/{tx_id}")
 def delete_transaction(
     tx_id: str,
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
-    cursor.execute("SELECT id FROM transactions WHERE id = ? AND user_id = ?", (tx_id, user_id))
+    cursor.execute("SELECT id FROM transactions WHERE id = ? AND user_id = ?", (tx_id, target_user_id))
     if not cursor.fetchone():
-        raise HTTPException(status_code=404, detail="Transaction not found.")
+        raise HTTPException(status_code=404, detail="Transaction not found or access denied.")
 
-    cursor.execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (tx_id, user_id))
+    cursor.execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (tx_id, target_user_id))
     db.commit()
     return {"message": "Transaction deleted successfully.", "id": tx_id}
 
 @router.get("/cashflow")
 def get_cashflow_summary(
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
     period: str = Query("6m", pattern="^(6m|12m)$"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, user_id)
     months_count = 12 if period == "12m" else 6
     cursor = db.cursor()
     cursor.execute("""
@@ -185,7 +198,7 @@ def get_cashflow_summary(
     GROUP BY SUBSTR(transaction_date, 1, 7)
     ORDER BY month_key DESC
     LIMIT ?
-    """, (user_id, months_count))
+    """, (target_user_id, months_count))
     rows = cursor.fetchall()
     
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -217,7 +230,7 @@ def get_cashflow_summary(
 
     return {
         "period": period,
-        "user_id": user_id,
+        "user_id": target_user_id,
         "months": results,
         "total_income": round(tot_inc, 2),
         "total_spending": round(tot_exp, 2),
@@ -229,18 +242,20 @@ def get_cashflow_summary(
 
 @router.get("/export")
 def export_transactions_csv(
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
     from fastapi.responses import Response
     import io
     import csv
 
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
     cursor.execute("""
     SELECT transaction_date, description, amount, direction, category, category_source, created_at
     FROM transactions WHERE user_id = ? ORDER BY transaction_date DESC
-    """, (user_id,))
+    """, (target_user_id,))
     rows = cursor.fetchall()
 
     output = io.StringIO()
@@ -253,28 +268,32 @@ def export_transactions_csv(
     return Response(
         content=csv_data,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=finsight_transactions_{user_id}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=finsight_transactions_{target_user_id}.csv"}
     )
 
 @router.delete("")
 def clear_all_transactions(
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
-    cursor.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))
-    cursor.execute("DELETE FROM imports WHERE user_id = ?", (user_id,))
-    cursor.execute("DELETE FROM recommendations WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM transactions WHERE user_id = ?", (target_user_id,))
+    cursor.execute("DELETE FROM imports WHERE user_id = ?", (target_user_id,))
+    cursor.execute("DELETE FROM recommendations WHERE user_id = ?", (target_user_id,))
     db.commit()
-    return {"message": f"All transactions and history reset for {user_id}.", "deleted": True}
+    return {"message": f"All transactions and history reset for {target_user_id}.", "deleted": True}
 
 @router.post("/seed")
 def seed_demo_transactions(
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Explicitly populates the demo ledger and initial goals if empty."""
+    target_user_id = verify_user_access(current_user, user_id)
     from backend.seed import seed_demo_data
     seed_demo_data(db)
-    return {"message": f"Demo ledger successfully seeded for {user_id}.", "seeded": True}
+    return {"message": f"Demo ledger successfully seeded for {target_user_id}.", "seeded": True}
 

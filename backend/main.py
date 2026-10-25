@@ -11,6 +11,8 @@ from backend.routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from backend.security import get_jwt_secret
+    get_jwt_secret()
     init_db()
     yield
 

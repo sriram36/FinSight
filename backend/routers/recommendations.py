@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime, timedelta, timezone
 from backend.database import get_db
+from backend.security import get_current_user, verify_user_access
 from backend.schemas.recommendation import (
     RecommendationRequest,
     RecommendationRead,
@@ -14,7 +15,8 @@ router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
 @router.get("/portfolio", response_model=List[RecommendationRead])
 def get_portfolio_insights_endpoint(
-    user_id: str = "default_user",
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
     """
@@ -23,17 +25,20 @@ def get_portfolio_insights_endpoint(
     2. Subscriptions & Recurring Commitments Audit
     3. Goal Acceleration & Surplus Allocation
     """
-    return generate_portfolio_insights(user_id=user_id, db=db)
+    target_user_id = verify_user_access(current_user, user_id)
+    return generate_portfolio_insights(user_id=target_user_id, db=db)
 
 @router.post("/generate", response_model=RecommendationRead)
 def generate_recommendation_endpoint(
     req: RecommendationRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, req.user_id)
     cursor = db.cursor()
     recent_end = req.recent_end
     if not recent_end:
-        cursor.execute("SELECT MAX(transaction_date) FROM transactions WHERE user_id = ?", (req.user_id,))
+        cursor.execute("SELECT MAX(transaction_date) FROM transactions WHERE user_id = ?", (target_user_id,))
         max_row = cursor.fetchone()
         if max_row and max_row[0]:
             r_end = datetime.strptime(max_row[0][:10], "%Y-%m-%d")
@@ -50,7 +55,7 @@ def generate_recommendation_endpoint(
     baseline_start = req.baseline_start or (b_end_dt - timedelta(days=89)).strftime("%Y-%m-%d")
 
     return generate_recommendation(
-        user_id=req.user_id,
+        user_id=target_user_id,
         config=req.configuration,
         baseline_start=baseline_start,
         baseline_end=baseline_end,
@@ -60,13 +65,18 @@ def generate_recommendation_endpoint(
     )
 
 @router.get("", response_model=List[RecommendationRead])
-def list_recommendations(user_id: str = "default_user", db=Depends(get_db)):
+def list_recommendations(
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
     cursor.execute("""
     SELECT id, user_id, configuration, category, action, reason, evidence_json,
            expected_impact, assumptions, is_verified, verifier_notes, created_at
     FROM recommendations WHERE user_id = ? ORDER BY created_at DESC
-    """, (user_id,))
+    """, (target_user_id,))
     rows = cursor.fetchall()
 
     results = []
@@ -110,12 +120,18 @@ def list_recommendations(user_id: str = "default_user", db=Depends(get_db)):
     return results
 
 @router.get("/{rec_id}/evidence")
-def inspect_recommendation_evidence(rec_id: str, user_id: str = "default_user", db=Depends(get_db)):
+def inspect_recommendation_evidence(
+    rec_id: str,
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM recommendations WHERE id = ? AND user_id = ?", (rec_id, user_id))
+    cursor.execute("SELECT * FROM recommendations WHERE id = ? AND user_id = ?", (rec_id, target_user_id))
     row = cursor.fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="Recommendation not found.")
+        raise HTTPException(status_code=404, detail="Recommendation not found or access denied.")
 
     evidence = {}
     raw_ev = row["evidence_json"]
@@ -130,7 +146,7 @@ def inspect_recommendation_evidence(rec_id: str, user_id: str = "default_user", 
     source_txs = []
     if source_ids:
         placeholders = ",".join("?" for _ in source_ids)
-        cursor.execute(f"SELECT * FROM transactions WHERE id IN ({placeholders})", source_ids)
+        cursor.execute(f"SELECT * FROM transactions WHERE id IN ({placeholders}) AND user_id = ?", list(source_ids) + [target_user_id])
         source_txs = [dict(t) for t in cursor.fetchall()]
 
     return {

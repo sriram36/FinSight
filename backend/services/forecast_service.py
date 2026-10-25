@@ -29,12 +29,20 @@ def calculate_cash_flow_forecast(
     horizon_days = max(7, min(90, horizon_days))
     end_date = now + timedelta(days=horizon_days)
     
-    if not rows:
+    # Upcoming recurring obligations from confirmed recurring items
+    upcoming_data = get_upcoming_schedule(user_id, horizon_days, db)
+    upcoming_events = upcoming_data.get("items") or upcoming_data.get("upcoming_items") or []
+    upcoming_obligations_total = float(
+        upcoming_data.get("total_upcoming") or upcoming_data.get("total_upcoming_amount") or 0.0
+    )
+
+    if not rows and not upcoming_events:
         return {
             "horizon_days": horizon_days,
             "start_date": now.isoformat(),
             "end_date": end_date.isoformat(),
             "starting_balance": starting_balance,
+            "daily_burn_rate": 0.0,
             "projected_income": 0.0,
             "upcoming_obligations_total": 0.0,
             "projected_variable_spend": 0.0,
@@ -47,27 +55,28 @@ def calculate_cash_flow_forecast(
             "status": "insufficient_data"
         }
         
-    # Analyze recent 60-day velocity
-    recent_cutoff = (now - timedelta(days=60)).isoformat()
-    recent_txs = [r for r in rows if r["transaction_date"] >= recent_cutoff]
-    if not recent_txs:
-        recent_txs = list(rows)
+    # Analyze recent 60-day velocity from transactions (if any)
+    if rows:
+        recent_cutoff = (now - timedelta(days=60)).isoformat()
+        recent_txs = [r for r in rows if r["transaction_date"] >= recent_cutoff]
+        if not recent_txs:
+            recent_txs = list(rows)
+            
+        dates = [r["transaction_date"][:10] for r in recent_txs]
+        min_date = datetime.fromisoformat(min(dates)).date()
+        max_date = datetime.fromisoformat(max(dates)).date()
+        observed_days = max(1, (max_date - min_date).days + 1)
         
-    dates = [r["transaction_date"][:10] for r in recent_txs]
-    min_date = datetime.fromisoformat(min(dates)).date()
-    max_date = datetime.fromisoformat(max(dates)).date()
-    observed_days = max(1, (max_date - min_date).days + 1)
-    
-    total_recent_income = sum(float(r["amount"]) for r in recent_txs if r["direction"] == "income")
-    total_recent_spending = sum(float(r["amount"]) for r in recent_txs if r["direction"] == "spending")
-    
-    daily_income_pace = total_recent_income / observed_days
-    daily_spend_pace = total_recent_spending / observed_days
-    
-    # Upcoming recurring obligations from confirmed recurring items
-    upcoming_data = get_upcoming_schedule(user_id, horizon_days, db)
-    upcoming_events = upcoming_data.get("upcoming_items", [])
-    upcoming_obligations_total = upcoming_data.get("total_upcoming_amount", 0.0)
+        total_recent_income = sum(float(r["amount"]) for r in recent_txs if r["direction"] == "income")
+        total_recent_spending = sum(float(r["amount"]) for r in recent_txs if r["direction"] == "spending")
+        
+        daily_income_pace = total_recent_income / observed_days
+        daily_spend_pace = total_recent_spending / observed_days
+    else:
+        observed_days = 0
+        total_recent_income = 0.0
+        daily_income_pace = 0.0
+        daily_spend_pace = 0.0
     
     # Project variable spend (spend excluding confirmed recurring payments)
     recurring_daily_equiv = upcoming_obligations_total / max(1, horizon_days)
@@ -87,13 +96,14 @@ def calculate_cash_flow_forecast(
     # Build timeline events
     events = []
     for item in upcoming_events:
+        due_date = item.get("due_date") or item.get("next_due_date") or now.isoformat()
         events.append({
-            "date": item["due_date"],
+            "date": due_date,
             "type": "obligation",
-            "name": item["merchant"],
-            "category": item["category"],
-            "amount": -float(item["amount"]),
-            "is_confirmed": item["is_confirmed"]
+            "name": item.get("merchant") or "Recurring Obligation",
+            "category": item.get("category", "Subscriptions"),
+            "amount": -float(item.get("amount", 0.0)),
+            "is_confirmed": bool(item.get("is_confirmed", False))
         })
         
     # Add recurring income expectation if steady income detected

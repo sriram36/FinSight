@@ -9,20 +9,21 @@ from backend.database import get_db
 client = TestClient(app)
 
 def test_full_system_e2e_flow():
-    # 1. Health check
+    # 1. Health check & Registration
     health_res = client.get("/health")
     assert health_res.status_code == 200
     assert health_res.json()["status"] == "ok"
 
-    user_id = f"e2e_user_{uuid.uuid4().hex[:8]}"
-
-    # Insert user in db to satisfy foreign key constraints
-    from backend.database import get_connection
-    conn = get_connection()
-    now_iso = datetime.now(timezone.utc).isoformat()
-    conn.cursor().execute("INSERT INTO users (id, name, email, created_at) VALUES (?, ?, ?, ?)", (user_id, "E2E User", f"{user_id}@example.com", now_iso))
-    conn.commit()
-    conn.close()
+    reg_res = client.post("/auth/register", json={
+        "name": "E2E User",
+        "email": f"e2e_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "E2EPassword123!"
+    })
+    assert reg_res.status_code == 200
+    user_info = reg_res.json()
+    user_id = user_info["id"]
+    token = user_info["token"]
+    headers = {"Authorization": f"Bearer {token}"}
 
     # 2. CSV Import Flow
     csv_content = """Date,Description,Amount,Type
@@ -35,7 +36,7 @@ def test_full_system_e2e_flow():
 """
     files = {"file": ("bank_statement.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
     data = {"user_id": user_id}
-    preview_res = client.post("/imports/preview", files=files, data=data)
+    preview_res = client.post("/imports/preview", files=files, data=data, headers=headers)
     assert preview_res.status_code == 200
     preview_data = preview_res.json()
     assert preview_data["total_rows"] == 6
@@ -59,12 +60,12 @@ def test_full_system_e2e_flow():
         "user_id": user_id,
         "file_name": "bank_statement.csv",
         "transactions": valid_txs
-    })
+    }, headers=headers)
     assert confirm_res.status_code == 200
     assert confirm_res.json()["accepted_count"] == 6
 
     # 3. Transaction List & CRUD
-    tx_res = client.get(f"/transactions?user_id={user_id}")
+    tx_res = client.get(f"/transactions?user_id={user_id}", headers=headers)
     assert tx_res.status_code == 200
     tx_list = tx_res.json()
     assert tx_list["total"] == 6
@@ -73,13 +74,14 @@ def test_full_system_e2e_flow():
     # Category override PATCH
     patch_res = client.patch(f"/transactions/{target_tx['id']}?user_id={user_id}", json={
         "category": "Groceries"
-    })
+    }, headers=headers)
     assert patch_res.status_code == 200
     assert patch_res.json()["category"] == "Groceries"
 
     # 4. Spending Profile with Normalized Baseline Math
     profile_res = client.get(
-        f"/profile?user_id={user_id}&baseline_start=2026-01-01&baseline_end=2026-01-31&recent_start=2026-02-01&recent_end=2026-02-28"
+        f"/profile?user_id={user_id}&baseline_start=2026-01-01&baseline_end=2026-01-31&recent_start=2026-02-01&recent_end=2026-02-28",
+        headers=headers
     )
     assert profile_res.status_code == 200
     profile_data = profile_res.json()
@@ -95,7 +97,7 @@ def test_full_system_e2e_flow():
         "target_amount": 50000.0,
         "current_amount": 10000.0,
         "target_date": future_date
-    })
+    }, headers=headers)
     assert goal_res.status_code == 201
     goal_data = goal_res.json()
     assert goal_data["title"] == "Emergency Fund"
@@ -105,7 +107,7 @@ def test_full_system_e2e_flow():
     pref_res = client.patch(f"/preferences/categories/Healthcare?user_id={user_id}", json={
         "is_protected": True,
         "reason": "Vital health coverage"
-    })
+    }, headers=headers)
     assert pref_res.status_code == 200
     assert pref_res.json()["is_protected"] is True
 
@@ -117,7 +119,7 @@ def test_full_system_e2e_flow():
         "baseline_end": "2026-01-31",
         "recent_start": "2026-02-01",
         "recent_end": "2026-02-28"
-    })
+    }, headers=headers)
     assert rec_res.status_code == 200
     rec_data = rec_res.json()
     assert rec_data["configuration"] == "C"
@@ -125,7 +127,7 @@ def test_full_system_e2e_flow():
     assert len(rec_data["evidence"]["source_transaction_ids"]) > 0
 
     # Evidence drill-down endpoint
-    evidence_res = client.get(f"/recommendations/{rec_data['id']}/evidence?user_id={user_id}")
+    evidence_res = client.get(f"/recommendations/{rec_data['id']}/evidence?user_id={user_id}", headers=headers)
     assert evidence_res.status_code == 200
     ev_data = evidence_res.json()
     assert ev_data["is_verified"] is True
@@ -138,7 +140,7 @@ def test_full_system_e2e_flow():
         "available_balance": 60000.0,
         "upcoming_obligations": 20000.0,
         "emergency_buffer": 10000.0
-    })
+    }, headers=headers)
     assert sim_res.status_code == 200
     sim_data = sim_res.json()
     assert sim_data["verdict"] == "comfortable"

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from typing import Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query
+from typing import Optional, Dict, Any
 import json
 from backend.database import get_db
+from backend.security import get_current_user, verify_user_access
 from backend.schemas.transaction import CSVPreviewSummary, CSVConfirmRequest
 from backend.services.import_service import parse_csv_preview, confirm_csv_import
 
@@ -10,10 +11,12 @@ router = APIRouter(prefix="/imports", tags=["Imports"])
 @router.post("/preview", response_model=CSVPreviewSummary)
 async def preview_csv_import(
     file: UploadFile = File(...),
-    user_id: str = Form("default_user"),
+    user_id: Optional[str] = Form("default_user"),
     column_mapping: Optional[str] = Form(None),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, user_id)
     try:
         content = await file.read()
         text_content = content.decode("utf-8", errors="replace")
@@ -30,7 +33,7 @@ async def preview_csv_import(
     return parse_csv_preview(
         file_content=text_content,
         file_name=file.filename or "upload.csv",
-        user_id=user_id,
+        user_id=target_user_id,
         db=db,
         custom_mapping=custom_map
     )
@@ -38,13 +41,15 @@ async def preview_csv_import(
 @router.post("/confirm")
 def confirm_import_endpoint(
     req: CSVConfirmRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db=Depends(get_db)
 ):
+    target_user_id = verify_user_access(current_user, req.user_id)
     if not req.transactions:
         raise HTTPException(status_code=400, detail="No transactions provided to confirm.")
     tx_dicts = [tx.model_dump() for tx in req.transactions]
     result = confirm_csv_import(
-        user_id=req.user_id,
+        user_id=target_user_id,
         file_name=req.file_name,
         transactions=tx_dicts,
         db=db,
@@ -55,12 +60,17 @@ def confirm_import_endpoint(
     return result
 
 @router.get("")
-def list_user_imports(user_id: str = "default_user", db=Depends(get_db)):
+def list_user_imports(
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
     cursor = db.cursor()
     cursor.execute("""
     SELECT id, file_name, total_rows, accepted_rows, rejected_rows, duplicate_rows, created_at
     FROM imports WHERE user_id = ? ORDER BY created_at DESC
-    """, (user_id,))
+    """, (target_user_id,))
     rows = cursor.fetchall()
     return [
         {

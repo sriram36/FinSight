@@ -201,17 +201,22 @@ def get_upcoming_schedule(user_id: str, horizon_days: int, db) -> Dict[str, Any]
             due = datetime.strptime(it["next_due_date"][:10], "%Y-%m-%d").date()
             if now_date <= due <= cutoff_date:
                 days_left = (due - now_date).days
-                it["days_remaining"] = days_left
-                upcoming.append(it)
-                total_upcoming_amount += it["amount"]
+                it_copy = dict(it)
+                it_copy["days_remaining"] = days_left
+                it_copy["due_date"] = it["next_due_date"]
+                upcoming.append(it_copy)
+                total_upcoming_amount += float(it["amount"])
         except Exception:
             pass
 
     upcoming.sort(key=lambda x: x.get("days_remaining", 999))
+    rounded_total = round(total_upcoming_amount, 2)
 
     return {
         "horizon_days": horizon_days,
-        "total_upcoming": round(total_upcoming_amount, 2),
+        "total_upcoming": rounded_total,
+        "total_upcoming_amount": rounded_total,
         "count": len(upcoming),
-        "items": upcoming
+        "items": upcoming,
+        "upcoming_items": upcoming
     }
