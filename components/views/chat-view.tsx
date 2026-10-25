@@ -109,42 +109,45 @@ export function ChatView() {
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       {/* Header Banner */}
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
+      <div className="rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                <MessageSquareText className="size-5" />
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary border border-primary/20">
+                <MessageSquareText className="size-4.5" />
               </div>
-              <h2 className="text-xl font-bold tracking-tight">Ask FinSight</h2>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Verified Intelligence
-              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[17px] font-bold tracking-tight">Ask FinSight</h2>
+                  <span className="badge-emerald inline-flex items-center gap-1.5 rounded-full px-2.5 py-px text-[10px] font-bold">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Verified
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                  Mathematical calculations run in Python, synthesized with{' '}
+                  <code className="px-1 py-px rounded bg-muted text-[10px] font-mono">gpt-5.6-luna</code>
+                </p>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Conversational financial intelligence. Mathematical calculations execute strictly in deterministic code, synthesized with Microsoft Foundry <code className="px-1 py-0.5 rounded bg-muted text-[11px] font-mono">gpt-5.6-luna</code>, and vetted by Claim Verifier.
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto text-xs text-muted-foreground border border-border/80 rounded-lg px-3 py-1.5 bg-muted/40">
-            <ShieldCheck className="size-4 text-primary shrink-0" />
-            <span>Claim Verifier: <strong>Strict (±1.0% margin)</strong></span>
+          <div className="flex items-center gap-2 self-start sm:self-auto text-xs text-muted-foreground border border-border/70 rounded-xl px-3 py-2 bg-muted/30">
+            <ShieldCheck className="size-3.5 text-primary shrink-0" />
+            <span>Claim Verifier: <strong>Strict (±1.0%)</strong></span>
           </div>
         </div>
 
         {/* Suggested Queries Chips */}
-        <div className="mt-4 pt-4 border-t border-border/60">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Suggested Ledger Inquiries
-          </p>
+        <div className="mt-5 pt-4 border-t border-border/50">
+          <p className="section-label mb-2.5">Suggested Queries</p>
           <div className="flex flex-wrap gap-2">
             {SUGGESTED_QUERIES.map((q, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSend(q)}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted/70 text-foreground transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-border/60 bg-muted/30 hover:bg-muted/70 hover:border-primary/30 text-foreground transition-all duration-150 disabled:opacity-50"
               >
                 <span>{q}</span>
                 <ArrowRight className="size-3 text-muted-foreground" />
@@ -155,25 +158,30 @@ export function ChatView() {
       </div>
 
       {/* Messages Stream */}
-      <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-xs flex flex-col min-h-[480px] max-h-[680px]">
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+      <div className="rounded-2xl border border-border/70 bg-card/60 backdrop-blur-sm flex flex-col min-h-[480px] max-h-[680px] shadow-xs">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin">
           {messages.map(msg => (
             <div
               key={msg.id}
-              className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+              className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} animate-slide-up`}
             >
-              <div className="flex items-center gap-2 mb-1.5 px-1">
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  {msg.sender === 'user' ? 'You' : 'FinSight Financial Copilot'}
+              <div className="flex items-center gap-2 mb-2 px-1">
+                {msg.sender === 'assistant' && (
+                  <div className="flex size-5 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
+                    <Sparkles className="size-2.5 text-primary" />
+                  </div>
+                )}
+                <span className="text-[11px] font-semibold text-muted-foreground">
+                  {msg.sender === 'user' ? 'You' : 'FinSight Copilot'}
                 </span>
-                <span className="text-[10px] text-muted-foreground/70">{msg.timestamp}</span>
+                <span className="text-[10px] text-muted-foreground/50">{msg.timestamp}</span>
               </div>
 
               <div
-                className={`max-w-[90%] sm:max-w-[80%] rounded-2xl p-4 sm:p-5 text-sm leading-relaxed ${
+                className={`max-w-[92%] sm:max-w-[82%] rounded-2xl p-4 sm:p-5 text-sm leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-primary text-primary-foreground font-medium rounded-tr-xs'
-                    : 'bg-card border border-border text-foreground shadow-xs rounded-tl-xs'
+                    ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground font-medium shadow-sm'
+                    : 'bg-card border border-border/70 text-foreground shadow-xs'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{msg.text}</div>
@@ -302,33 +310,33 @@ export function ChatView() {
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 border-t border-border bg-card/80 rounded-b-2xl">
+        <div className="p-4 border-t border-border/60 bg-card/90 rounded-b-2xl">
           <form
             onSubmit={e => {
               e.preventDefault()
               handleSend()
             }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2.5"
           >
             <input
               type="text"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
-              placeholder="Ask anything about your ledger (e.g. 'How much did I spend on food last month?')"
+              placeholder="Ask anything about your ledger..."
               disabled={loading}
-              className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+              className="flex-1 rounded-xl border border-border/60 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 disabled:opacity-50 transition-all"
             />
             <Button
               type="submit"
               disabled={loading || !inputValue.trim()}
-              className="rounded-xl px-4 py-2.5 flex items-center gap-1.5"
+              className="rounded-xl px-4 py-2.5 flex items-center gap-1.5 glow-subtle"
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              <span className="hidden sm:inline">Inquire</span>
+              <span className="hidden sm:inline text-[13px]">Inquire</span>
             </Button>
           </form>
-          <div className="mt-2 text-center text-[11px] text-muted-foreground">
-            Zero hallucination guarantee: financial math is computed deterministically in code before LLM response generation.
+          <div className="mt-2 text-center text-[11px] text-muted-foreground/50">
+            Financial math is computed deterministically before LLM generation. Zero hallucination on numeric facts.
           </div>
         </div>
       </div>

@@ -3,39 +3,31 @@
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
+  AlertTriangle,
   BarChart3,
   Bell,
   Check,
   ChevronDown,
-  CircleHelp,
+  FileText,
   FileUp,
   FlaskConical,
   LayoutDashboard,
+  LogOut,
   Menu,
-  MoreHorizontal,
-  Plus,
+  MessageSquareText,
+  PieChart,
+  Repeat,
   Search,
   Settings2,
   ShieldCheck,
   Sparkles,
   Target,
-  Upload,
-  UserRound,
-  WalletCards,
-  MessageSquareText,
-  X,
-  Layers,
-  Cpu,
-  PieChart,
-  Repeat,
-  AlertTriangle,
   TrendingUp,
-  FileText,
-  Lock,
-  LogOut,
-  User
+  Upload,
+  WalletCards,
+  X,
+  Zap,
+  ArrowUpRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OverviewView } from '@/components/views/overview-view'
@@ -56,41 +48,62 @@ import { SettingsModal } from '@/components/settings-modal'
 import { AuthModal } from '@/components/auth-modal'
 import { AuthUser } from '@/lib/types'
 
+interface NavItem {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  badge?: string
+  badgeClass?: string
+  description?: string
+}
+
 interface NavGroup {
   title: string
-  items: {
-    label: string
-    icon: React.ComponentType<{ className?: string }>
-    badge?: string
-    badgeVariant?: 'primary' | 'emerald' | 'amber'
-  }[]
+  items: NavItem[]
 }
 
 const navGroups: NavGroup[] = [
   {
     title: 'Daily Finance',
     items: [
-      { label: 'Overview', icon: LayoutDashboard },
-      { label: 'Transactions', icon: WalletCards },
-      { label: 'Budgets', icon: PieChart },
-      { label: 'Subscriptions', icon: Repeat },
+      { label: 'Overview', icon: LayoutDashboard, description: 'Financial snapshot' },
+      { label: 'Transactions', icon: WalletCards, description: 'Full ledger history' },
+      { label: 'Budgets', icon: PieChart, description: 'Spending limits' },
+      { label: 'Subscriptions', icon: Repeat, description: 'Recurring payments' },
     ],
   },
   {
-    title: 'Financial Intelligence',
+    title: 'AI Intelligence',
     items: [
-      { label: 'Ask FinSight', icon: MessageSquareText, badge: 'gpt-5.6', badgeVariant: 'emerald' },
-      { label: 'Verified Insights', icon: Sparkles, badge: 'System C', badgeVariant: 'primary' },
-      { label: 'Unusual Spending', icon: AlertTriangle, badge: 'Active', badgeVariant: 'amber' },
-      { label: 'Cash Flow Forecast', icon: TrendingUp },
+      {
+        label: 'Ask FinSight',
+        icon: MessageSquareText,
+        badge: 'AI',
+        badgeClass: 'badge-teal',
+        description: 'Copilot chat'
+      },
+      {
+        label: 'Verified Insights',
+        icon: Sparkles,
+        badge: 'System C',
+        badgeClass: 'badge-violet',
+        description: 'Evidence-grounded'
+      },
+      {
+        label: 'Unusual Spending',
+        icon: AlertTriangle,
+        badge: 'Live',
+        badgeClass: 'badge-amber',
+        description: 'Anomaly detection'
+      },
+      { label: 'Cash Flow Forecast', icon: TrendingUp, description: 'Future projections' },
     ],
   },
   {
-    title: 'Planning & Reviews',
+    title: 'Planning',
     items: [
-      { label: 'Goals', icon: Target },
-      { label: 'Monthly Review', icon: FileText },
-      { label: 'Simulate', icon: BarChart3 },
+      { label: 'Goals', icon: Target, description: 'Savings milestones' },
+      { label: 'Monthly Review', icon: FileText, description: 'Period summary' },
+      { label: 'Simulate', icon: BarChart3, description: 'Scenario modelling' },
     ],
   },
 ]
@@ -111,7 +124,6 @@ export function FinSightShell() {
     is_demo: true,
   })
 
-  // Check saved session on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUser = localStorage.getItem('finsight_user')
@@ -135,25 +147,17 @@ export function FinSightShell() {
     const dupCount = result?.duplicate_count ?? 0
     const msg =
       dupCount > 0
-        ? `Successfully committed ${count} transaction${count === 1 ? '' : 's'} (${dupCount} duplicate${count === 1 ? '' : 's'} skipped).`
+        ? `Successfully committed ${count} transaction${count === 1 ? '' : 's'} (${dupCount} duplicate${dupCount === 1 ? '' : 's'} skipped).`
         : `Successfully committed ${count} transaction${count === 1 ? '' : 's'} into verified database.`
     setImportNotification(msg)
     setTimeout(() => setImportNotification(null), 6000)
   }
 
   const renderActiveView = () => {
-    if (mode === 'research') {
-      return <ResearchView />
-    }
-
+    if (mode === 'research') return <ResearchView />
     switch (activeView) {
       case 'Overview':
-        return (
-          <OverviewView
-            onOpenImport={() => setShowImport(true)}
-            onNavigateTab={(tab) => setActiveView(tab)}
-          />
-        )
+        return <OverviewView onOpenImport={() => setShowImport(true)} onNavigateTab={(tab) => setActiveView(tab)} />
       case 'Ask FinSight':
         return <ChatView />
       case 'Verified Insights':
@@ -179,12 +183,7 @@ export function FinSightShell() {
       case 'Goals':
         return <GoalsView />
       default:
-        return (
-          <OverviewView
-            onOpenImport={() => setShowImport(true)}
-            onNavigateTab={(tab) => setActiveView(tab)}
-          />
-        )
+        return <OverviewView onOpenImport={() => setShowImport(true)} onNavigateTab={(tab) => setActiveView(tab)} />
     }
   }
 
@@ -196,49 +195,41 @@ export function FinSightShell() {
     .toUpperCase()
 
   return (
-    <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
-      {/* Mobile nav backdrop */}
+    <div className="min-h-screen bg-background text-foreground antialiased gradient-mesh selection:bg-primary/20 selection:text-primary">
+      {/* Mobile overlay */}
       {mobileNavOpen && (
         <button
           aria-label="Close navigation overlay"
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-xs transition-opacity lg:hidden"
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm transition-opacity lg:hidden"
           onClick={() => setMobileNavOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* ── Sidebar ───────────────────────────────────────────── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-card/95 px-5 py-6 backdrop-blur-md transition-transform duration-200 lg:translate-x-0 overflow-y-auto ${
-          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-40 flex w-[268px] flex-col border-r border-border/60 glass-sidebar px-4 py-5 transition-transform duration-300 ease-in-out lg:translate-x-0 scrollbar-thin overflow-y-auto ${
+          mobileNavOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         }`}
       >
-        {/* Brand Header */}
-        <div className="flex items-center justify-between px-1">
+        {/* Brand */}
+        <div className="flex items-center justify-between px-1 mb-6">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl border border-border bg-card p-1 shadow-xs">
-              <Image
-                src="/logo.svg"
-                alt="FinSight AI Logo"
-                width={26}
-                height={26}
-                className="object-contain"
-                priority
-              />
+            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-sm">
+              <Zap className="size-5 text-primary" />
+              <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 border-2 border-sidebar animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <p className="text-[15px] font-bold tracking-tight">FinSight AI</p>
-                <span className="rounded-md bg-primary/10 px-1.5 py-0.2 text-[10px] font-bold text-primary">
-                  v1.2
-                </span>
+                <p className="text-[15px] font-bold tracking-tight text-foreground">FinSight AI</p>
+                <span className="badge-teal rounded-md px-1.5 py-px text-[10px] font-bold">v1.2</span>
               </div>
-              <p className="text-[11px] text-muted-foreground font-medium">Evidence-grounded finance</p>
+              <p className="text-[11px] text-muted-foreground leading-tight">Evidence-grounded finance</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden size-8 rounded-lg"
+            className="lg:hidden size-8 rounded-xl text-muted-foreground hover:text-foreground"
             onClick={() => setMobileNavOpen(false)}
             aria-label="Close navigation"
           >
@@ -246,30 +237,25 @@ export function FinSightShell() {
           </Button>
         </div>
 
-        {/* Workspace mode selector */}
-        <div className="mt-6 px-1">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-            Workspace Mode
-          </p>
-          <div className="flex rounded-xl bg-muted/60 p-1 border border-border/60">
+        {/* Mode toggle */}
+        <div className="mb-5 px-1">
+          <p className="section-label mb-2">Workspace</p>
+          <div className="flex rounded-xl bg-muted/50 p-1 border border-border/60 gap-0.5">
             <button
-              onClick={() => {
-                setMode('personal')
-                if (mode === 'research') setActiveView('Overview')
-              }}
-              className={`flex-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+              onClick={() => { setMode('personal'); if (mode === 'research') setActiveView('Overview') }}
+              className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-all duration-150 ${
                 mode === 'personal'
-                  ? 'bg-background text-foreground shadow-xs'
+                  ? 'bg-background text-foreground shadow-sm border border-border/50'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Personal Finance
+              Personal
             </button>
             <button
               onClick={() => setMode('research')}
-              className={`flex-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+              className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-all duration-150 ${
                 mode === 'research'
-                  ? 'bg-background text-foreground shadow-xs'
+                  ? 'bg-background text-foreground shadow-sm border border-border/50'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -278,45 +264,42 @@ export function FinSightShell() {
           </div>
         </div>
 
-        {/* Categorized Navigation */}
-        <nav className="mt-6 flex-1 space-y-6" aria-label="Primary navigation">
+        {/* Nav groups */}
+        <nav className="flex-1 space-y-5" aria-label="Primary navigation">
           {mode === 'personal' ? (
             navGroups.map((group) => (
               <div key={group.title}>
-                <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                  {group.title}
-                </p>
-                <div className="flex flex-col gap-1">
+                <p className="section-label mb-2 px-1">{group.title}</p>
+                <div className="flex flex-col gap-0.5">
                   {group.items.map((item) => {
                     const isActive = activeView === item.label
                     return (
                       <button
                         key={item.label}
-                        onClick={() => {
-                          setActiveView(item.label)
-                          setMobileNavOpen(false)
-                        }}
-                        className={`group relative flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        onClick={() => { setActiveView(item.label); setMobileNavOpen(false) }}
+                        className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-all duration-150 ${
                           isActive
-                            ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                            ? 'bg-primary text-primary-foreground font-semibold nav-active-glow'
                             : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <item.icon className="size-4 shrink-0" />
-                          <span>{item.label}</span>
+                          <div className={`flex size-7 items-center justify-center rounded-lg transition-all ${
+                            isActive
+                              ? 'bg-white/15'
+                              : 'bg-muted/40 group-hover:bg-muted'
+                          }`}>
+                            <item.icon className="size-3.5 shrink-0" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="text-[13px] font-medium leading-tight">{item.label}</span>
+                            {item.description && !isActive && (
+                              <span className="text-[10px] text-muted-foreground/70 leading-tight">{item.description}</span>
+                            )}
+                          </div>
                         </div>
-
                         {item.badge && !isActive && (
-                          <span
-                            className={`rounded-full px-2 py-0.2 text-[10px] font-bold ${
-                              item.badgeVariant === 'emerald'
-                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                : item.badgeVariant === 'amber'
-                                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                : 'bg-primary/15 text-primary'
-                            }`}
-                          >
+                          <span className={`rounded-full px-2 py-px text-[10px] font-bold ${item.badgeClass ?? 'badge-teal'}`}>
                             {item.badge}
                           </span>
                         )}
@@ -328,65 +311,69 @@ export function FinSightShell() {
             ))
           ) : (
             <div>
-              <p className="mb-2.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                Benchmark Evaluation
-              </p>
+              <p className="section-label mb-2 px-1">Benchmark</p>
               <button
-                onClick={() => {
-                  setMode('research')
-                  setMobileNavOpen(false)
-                }}
-                className="flex w-full items-center gap-3 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-xs"
+                onClick={() => { setMode('research'); setMobileNavOpen(false) }}
+                className="flex w-full items-center gap-3 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground nav-active-glow"
               >
-                <FlaskConical className="size-4 shrink-0" />
-                <span>PersonaLedger Benchmark</span>
+                <div className="flex size-7 items-center justify-center rounded-lg bg-white/15">
+                  <FlaskConical className="size-3.5 shrink-0" />
+                </div>
+                <span>PersonaLedger</span>
               </button>
             </div>
           )}
 
+          {/* Settings group */}
           <div>
-            <p className="mb-2.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-              Controls & Settings
-            </p>
-            <div className="flex flex-col gap-1">
+            <p className="section-label mb-2 px-1">System</p>
+            <div className="flex flex-col gap-0.5">
               <button
                 onClick={() => setShowSettings(true)}
-                className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted/70 hover:text-foreground"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-muted-foreground hover:bg-muted/70 hover:text-foreground transition"
               >
-                <Settings2 className="size-4 shrink-0" />
-                <span>Sandbox & Database</span>
+                <div className="flex size-7 items-center justify-center rounded-lg bg-muted/40">
+                  <Settings2 className="size-3.5 shrink-0" />
+                </div>
+                <span className="text-[13px] font-medium">Sandbox & Database</span>
               </button>
             </div>
           </div>
         </nav>
 
-        {/* Security & Isolation Pill */}
-        <div className="mt-4 rounded-xl border border-border/80 bg-muted/40 p-3.5">
-          <div className="mb-1 flex items-center gap-2">
-            <ShieldCheck className="size-4 text-emerald-500" />
-            <span className="text-xs font-bold tracking-tight">Isolated Ledger Storage</span>
+        {/* Security pill */}
+        <div className="mt-4 rounded-2xl border border-border/60 bg-muted/30 p-3.5 backdrop-blur-sm">
+          <div className="flex items-start gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0 mt-0.5">
+              <ShieldCheck className="size-3.5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-[12px] font-bold text-foreground mb-0.5">Isolated Ledger Storage</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Strict SQLite / PostgreSQL persistence. Deterministic Python math stops LLM drift.
+              </p>
+            </div>
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Strict local SQLite / PostgreSQL persistence. Deterministic Python math stops LLM mathematical drift.
-          </p>
         </div>
 
-        {/* User profile avatar / Account switcher */}
-        <div className="mt-4 flex items-center justify-between border-t border-border px-1 pt-4">
+        {/* User profile */}
+        <div className="mt-3 flex items-center justify-between border-t border-border/50 px-1 pt-3">
           <div
             onClick={() => setShowAuthModal(true)}
-            className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-85 transition flex-1"
+            className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-85 transition flex-1"
           >
-            <div className="relative">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/20 text-xs font-bold text-primary">
+            <div className="relative shrink-0">
+              <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary/25 to-primary/10 text-xs font-bold text-primary border border-primary/20">
                 {initials}
               </div>
-              <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card ${currentUser.is_demo ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-sidebar ${
+                currentUser.is_demo ? 'bg-amber-500' : 'bg-emerald-500'
+              }`} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold">{currentUser.name}</p>
+              <p className="truncate text-[13px] font-semibold">{currentUser.name}</p>
               <p className="truncate text-[11px] text-muted-foreground">
-                {currentUser.is_demo ? 'Demo Sandbox' : 'Authenticated'}
+                {currentUser.is_demo ? '● Demo Sandbox' : '● Authenticated'}
               </p>
             </div>
           </div>
@@ -397,106 +384,105 @@ export function FinSightShell() {
                   localStorage.removeItem('finsight_token')
                   localStorage.removeItem('finsight_user')
                 }
-                setCurrentUser({
-                  id: 'default_user',
-                  name: 'Jordan Davis',
-                  email: 'jordan@finsight.local',
-                  token: 'tok_demo_jordan_sandbox',
-                  is_demo: true,
-                })
+                setCurrentUser({ id: 'default_user', name: 'Jordan Davis', email: 'jordan@finsight.local', token: 'tok_demo_jordan_sandbox', is_demo: true })
               }}
-              title="Sign out to demo sandbox"
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition cursor-pointer"
+              title="Sign out"
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition"
             >
-              <LogOut className="size-4" />
+              <LogOut className="size-3.5" />
             </button>
           ) : (
-            <div onClick={() => setShowAuthModal(true)} className="cursor-pointer p-1.5 text-muted-foreground hover:text-foreground">
-              <ChevronDown className="size-4" />
+            <div onClick={() => setShowAuthModal(true)} className="cursor-pointer p-1.5 text-muted-foreground hover:text-foreground transition">
+              <ChevronDown className="size-3.5" />
             </div>
           )}
         </div>
       </aside>
 
-      {/* Main content area */}
-      <div className="lg:pl-72">
-        {/* Top Header */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/85 px-6 backdrop-blur-md sm:px-10">
+      {/* ── Main content ──────────────────────────────────────── */}
+      <div className="lg:pl-[268px] flex flex-col min-h-screen">
+
+        {/* Top header */}
+        <header className="sticky top-0 z-20 flex h-[62px] items-center justify-between border-b border-border/60 bg-background/80 px-5 backdrop-blur-xl sm:px-8 shadow-sm shadow-border/20">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden size-8 rounded-lg"
+              className="lg:hidden size-8 rounded-xl"
               onClick={() => setMobileNavOpen(true)}
               aria-label="Open navigation"
             >
-              <Menu className="size-5" />
+              <Menu className="size-4" />
             </Button>
+
             <div>
-              <p className="text-sm font-bold tracking-tight">Welcome, {currentUser.name.split(' ')[0]}</p>
-              <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-                <span className="inline-flex items-center gap-1">
+              <p className="text-[14px] font-bold text-foreground leading-tight">
+                Welcome back, <span className="text-primary">{currentUser.name.split(' ')[0]}</span>
+              </p>
+              <div className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
+                <span className="inline-flex items-center gap-1.5">
                   <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <code className="text-[11px] font-mono font-medium">gpt-5.6-luna</code> online
+                  <code className="font-mono text-[10px] font-medium">gpt-5.6-luna</code> online
                 </span>
-                <span>·</span>
-                <span>Claim Verifier Active (±1.0%)</span>
+                <span className="text-muted-foreground/40">·</span>
+                <span>Claim Verifier ±1.0%</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowImport(true)}
-              className="gap-1.5 rounded-xl text-xs font-semibold shadow-2xs"
+              className="gap-1.5 rounded-xl text-xs font-semibold border-border/70 shadow-xs h-8 px-3"
             >
               <Upload className="size-3.5 text-primary" />
-              Import CSV
+              <span className="hidden sm:inline">Import CSV</span>
             </Button>
 
             <button
               onClick={() => setShowAuthModal(true)}
-              className="flex items-center gap-2 rounded-xl border border-border/80 bg-card px-2.5 py-1 text-xs font-semibold hover:border-border transition shadow-2xs"
+              className="flex items-center gap-2 rounded-xl border border-border/70 bg-card/80 px-2.5 py-1.5 text-xs font-semibold hover:border-primary/30 hover:bg-primary/5 transition-all duration-150 shadow-xs"
             >
-              <div className="flex size-6 items-center justify-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground">
+              <div className="flex size-6 items-center justify-center rounded-lg bg-primary/15 text-[10px] font-bold text-primary">
                 {initials}
               </div>
-              <span className="hidden sm:inline text-xs font-medium text-muted-foreground">
-                {currentUser.is_demo ? 'Demo Mode' : 'Account'}
+              <span className="hidden sm:inline text-[12px] font-medium text-muted-foreground">
+                {currentUser.is_demo ? 'Demo' : 'Account'}
               </span>
             </button>
           </div>
         </header>
 
-        {/* Page Container with Generous Breathing Room */}
-        <main className="mx-auto max-w-7xl px-6 py-8 sm:px-10 sm:py-10 space-y-8">
+        {/* Page body */}
+        <main className="flex-1 mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 sm:py-10 space-y-8">
+
+          {/* Import success banner */}
           {importNotification && (
-            <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3.5 text-sm text-emerald-800 dark:text-emerald-200 animate-in fade-in">
-              <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 px-5 py-3.5 text-sm text-emerald-800 dark:text-emerald-200 animate-slide-up glow-emerald">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/25 shrink-0">
+                <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              </div>
               {importNotification}
             </div>
           )}
 
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          {/* Page header */}
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end animate-slide-up">
             <div>
-              <div className="mb-2.5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-2xs">
-                <span
-                  className={`size-1.5 rounded-full ${
-                    mode === 'research' ? 'bg-amber-500' : 'bg-emerald-500'
-                  }`}
-                />
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/80 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-xs">
+                <span className={`size-1.5 rounded-full ${mode === 'research' ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`} />
                 {mode === 'research' ? 'Synthetic Research Mode' : 'Personal Finance Mode'}
               </div>
-              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed max-w-3xl">{subtitle}</p>
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-[28px]">{title}</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed max-w-2xl">{subtitle}</p>
             </div>
 
             {mode === 'personal' && (
               <Button
                 onClick={() => setShowImport(true)}
-                className="w-full gap-2 sm:w-auto rounded-xl font-semibold shadow-xs shrink-0"
+                className="w-full gap-2 sm:w-auto rounded-xl font-semibold shadow-sm shrink-0 glow-subtle"
               >
                 <Upload className="size-4" />
                 Import Transactions
@@ -504,45 +490,33 @@ export function FinSightShell() {
             )}
           </div>
 
-          {/* Active View Container */}
-          <div className="pt-2">{renderActiveView()}</div>
+          {/* Active view */}
+          <div className="animate-slide-up">{renderActiveView()}</div>
 
-          {/* Educational Disclaimer */}
-          <p className="text-center text-[11px] leading-relaxed text-muted-foreground border-t border-border/40 pt-8 mt-12">
-            FinSight AI provides evidence-grounded financial intelligence and mathematical analysis, not regulated financial advisory. All recommendations and metrics reconcile directly with your imported ledger receipts.
+          {/* Footer */}
+          <p className="text-center text-[11px] leading-relaxed text-muted-foreground/60 border-t border-border/30 pt-8 mt-8">
+            FinSight AI provides evidence-grounded financial intelligence, not regulated financial advisory. All recommendations reconcile directly with your imported ledger.
           </p>
         </main>
       </div>
 
-      {/* CSV Import Modal */}
+      {/* Modals */}
       {showImport && (
         <ImportModal
           onClose={() => setShowImport(false)}
-          onSuccess={(count, result) => {
-            setShowImport(false)
-            handleImportSuccess(count || 0, result)
-          }}
+          onSuccess={(count, result) => { setShowImport(false); handleImportSuccess(count || 0, result) }}
         />
       )}
-
-      {/* Settings & Sandbox Modal */}
       {showSettings && (
         <SettingsModal
           onClose={() => setShowSettings(false)}
-          onDataReset={() => {
-            setActiveView('Overview')
-          }}
+          onDataReset={() => setActiveView('Overview')}
         />
       )}
-
-      {/* Authentication Modal */}
       {showAuthModal && (
         <AuthModal
           onClose={() => setShowAuthModal(false)}
-          onSuccess={(user) => {
-            setCurrentUser(user)
-            setShowAuthModal(false)
-          }}
+          onSuccess={(user) => { setCurrentUser(user); setShowAuthModal(false) }}
         />
       )}
     </div>

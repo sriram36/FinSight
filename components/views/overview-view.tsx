@@ -186,25 +186,26 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-7">
       {/* Financial Summary Cards */}
       <section aria-label="Financial summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
         {/* Metric 1: Recent Spending */}
-        <div className="group rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-indigo-500/40 hover:shadow-md transition-all duration-200">
+        <div className="card-lift group rounded-2xl border border-border/70 bg-card p-5 shadow-xs hover:border-indigo-500/30 hover:shadow-md">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recent Spending</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+            <div className="min-w-0 flex-1">
+              <p className="section-label mb-2">Recent Spending</p>
+              <p className="text-[22px] font-extrabold tracking-tight text-foreground leading-none">
                 ₹{totalRecentSpend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
-            <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 group-hover:scale-105 transition">
-              <ArrowDownLeft className="size-5" />
+            <div className="ml-3 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/10 text-indigo-500 border border-indigo-500/20 group-hover:scale-105 group-hover:from-indigo-500/30 transition-all duration-200">
+              <ArrowDownLeft className="size-4.5" />
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs">
+          <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
-              {profile ? `${profile.recent_days} days activity` : 'Active window'}
+              {profile ? `${profile.recent_days}d window` : 'Active window'}
             </span>
             <span
               className={`inline-flex items-center gap-1 font-semibold ${
@@ -213,49 +214,50 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
             >
               {spendVariance <= 0 ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
               {spendVariance <= 0
-                ? `${Math.abs(spendVariance).toFixed(1)}% below baseline`
-                : `+${spendVariance.toFixed(1)}% above pace`}
+                ? `${Math.abs(spendVariance).toFixed(1)}% under`
+                : `+${spendVariance.toFixed(1)}% over`}
             </span>
           </div>
         </div>
 
         {/* Metric 2: Baseline Normalized Target */}
-        <div className="group rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-sky-500/40 hover:shadow-md transition-all duration-200">
+        <div className="card-lift group rounded-2xl border border-border/70 bg-card p-5 shadow-xs hover:border-sky-500/30 hover:shadow-md">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Normalized Baseline</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+            <div className="min-w-0 flex-1">
+              <p className="section-label mb-2">Normalized Baseline</p>
+              <p className="text-[22px] font-extrabold tracking-tight text-foreground leading-none">
                 ₹{normalizedBaselineSpend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
-            <div className="flex size-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500 border border-sky-500/20 group-hover:scale-105 transition">
-              <WalletCards className="size-5" />
+            <div className="ml-3 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-cyan-500/10 text-sky-500 border border-sky-500/20 group-hover:scale-105 group-hover:from-sky-500/30 transition-all duration-200">
+              <WalletCards className="size-4.5" />
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Target: (B / D_b) × D_r</span>
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
-              Deterministic Math
+          <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Formula: (B / D_b) × D_r</span>
+            <span className="badge-teal rounded-md px-2 py-px text-[10px] font-semibold">
+              Deterministic
             </span>
           </div>
         </div>
 
         {/* Metric 3: Active Goals */}
-        <div className="group rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-emerald-500/40 hover:shadow-md transition-all duration-200">
+        <div className="card-lift group rounded-2xl border border-border/70 bg-card p-5 shadow-xs hover:border-emerald-500/30 hover:shadow-md">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goals Feasibility</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-                {goals.filter(g => g.is_feasible).length} / {goals.length || 0}
+            <div className="min-w-0 flex-1">
+              <p className="section-label mb-2">Goals Feasibility</p>
+              <p className="text-[22px] font-extrabold tracking-tight text-foreground leading-none">
+                {goals.filter(g => g.is_feasible).length}
+                <span className="text-base font-semibold text-muted-foreground"> / {goals.length || 0}</span>
               </p>
             </div>
-            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 group-hover:scale-105 transition">
-              <Target className="size-5" />
+            <div className="ml-3 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-500 border border-emerald-500/20 group-hover:scale-105 group-hover:from-emerald-500/30 transition-all duration-200">
+              <Target className="size-4.5" />
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs">
+          <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
-              {goals.length === 0 ? 'No active milestones' : 'Feasible without deficit'}
+              {goals.length === 0 ? 'No active milestones' : 'Feasible targets'}
             </span>
             <span
               className={`font-semibold ${
@@ -264,58 +266,59 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
                   : 'text-rose-600 dark:text-rose-400'
               }`}
             >
-              {goals.length === 0 ? '0 milestones' : `${goals.filter(g => !g.is_feasible).length} need attention`}
+              {goals.length === 0 ? '—' : goals.every(g => g.is_feasible) ? 'All on track' : `${goals.filter(g => !g.is_feasible).length} at risk`}
             </span>
           </div>
         </div>
 
-        {/* Metric 4: AI Recommendations Grounding */}
-        <div className="group rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-emerald-500/40 hover:shadow-md transition-all duration-200">
+        {/* Metric 4: AI Evidence Grounding */}
+        <div className="card-lift group rounded-2xl border border-border/70 bg-card p-5 shadow-xs hover:border-emerald-500/30 hover:shadow-md">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evidence Grounding</p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-                  {systemCRec?.is_verified ? '100% Verified' : 'Rule-Based'}
+            <div className="min-w-0 flex-1">
+              <p className="section-label mb-2">Evidence Grounding</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[22px] font-extrabold tracking-tight leading-none text-emerald-600 dark:text-emerald-400">
+                  {systemCRec?.is_verified ? '100%' : 'Rule'}
                 </span>
-                <span className="relative flex size-2">
+                <span className="relative flex size-2 mt-0.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
                 </span>
               </div>
             </div>
-            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 group-hover:scale-105 transition">
-              <ShieldCheck className="size-5" />
+            <div className="ml-3 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-500 border border-emerald-500/20 group-hover:scale-105 group-hover:from-emerald-500/30 transition-all duration-200">
+              <ShieldCheck className="size-4.5" />
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs">
+          <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
-              {systemCRec?.category ? `Focus: ${systemCRec.category}` : 'Claim Verifier Active'}
+              {systemCRec?.category ? systemCRec.category : 'Verifier active'}
             </span>
-            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-              ±1.0% Margin Audit
+            <span className="badge-emerald rounded-md px-2 py-px text-[10px] font-semibold">
+              ±1.0% Audit
             </span>
           </div>
         </div>
+
       </section>
 
       {/* Center Layout: Cashflow + System C Insight */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
         {/* Cash Flow Section */}
-        <section className="rounded-2xl border border-border/80 bg-card shadow-xs flex flex-col justify-between">
-          <div className="flex flex-col gap-3 border-b border-border/80 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="rounded-2xl border border-border/70 bg-card shadow-xs flex flex-col justify-between">
+          <div className="flex flex-col gap-3 border-b border-border/60 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-foreground tracking-tight">Cash Flow Trajectory</h2>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Empirical Aggregation
+              <div className="flex items-center gap-2.5">
+                <h2 className="font-bold text-[15px] text-foreground tracking-tight">Cash Flow Trajectory</h2>
+                <span className="badge-teal rounded-full px-2 py-px text-[10px] font-bold">
+                  Empirical
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">Monthly income credits vs. normalized spending pace</p>
             </div>
             <button
               onClick={() => setCashflowPeriod(cashflowPeriod === '6m' ? '12m' : '6m')}
-              className="flex items-center gap-1.5 self-start rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition"
+              className="flex items-center gap-1.5 self-start rounded-xl border border-border/70 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition"
             >
               {cashflowPeriod === '6m' ? 'Last 6 months' : 'Last 12 months'}
               <ChevronDown className="size-3.5" />
@@ -381,14 +384,14 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
         </section>
 
         {/* AI Insight Card (System C) */}
-        <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card shadow-xs">
+        <section className="flex flex-col justify-between rounded-2xl border border-border/70 bg-card shadow-xs">
           <div>
-            <div className="flex items-start justify-between border-b border-border/80 p-5">
+            <div className="flex items-start justify-between border-b border-border/60 p-5">
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-foreground tracking-tight">Verified Insight</h2>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="font-bold text-[15px] text-foreground tracking-tight">Verified Insight</h2>
                   {systemCRec?.is_verified && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="badge-emerald inline-flex items-center gap-1 rounded-full px-2.5 py-px text-[10px] font-bold">
                       <CheckCircle2 className="size-3" />
                       Grounded
                     </span>
@@ -396,8 +399,8 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">System C · Mathematical claim validation</p>
               </div>
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                <Sparkles className="size-4" />
+              <div className="flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary border border-primary/20">
+                <Sparkles className="size-4.5" />
               </div>
             </div>
 
@@ -461,8 +464,8 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
       </div>
 
       {/* Recent Transactions List */}
-      <section className="rounded-2xl border border-border/80 bg-card shadow-xs">
-        <div className="flex items-center justify-between border-b border-border/80 p-5">
+      <section className="rounded-2xl border border-border/70 bg-card shadow-xs">
+        <div className="flex items-center justify-between border-b border-border/60 p-5">
           <div>
             <h2 className="font-bold text-foreground tracking-tight">Recent Ledger Activity</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Verified transactions stored in your local ledger</p>
