@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.database import init_db
-from backend.routers import health, imports, transactions, profile, goals, scenarios, recommendations, research
+from backend.routers import health, imports, transactions, profile, goals, scenarios, recommendations, research, chat
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +33,7 @@ app.include_router(goals.router)
 app.include_router(scenarios.router)
 app.include_router(recommendations.router)
 app.include_router(research.router)
+app.include_router(chat.router)
 
 
 

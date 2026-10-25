@@ -28,6 +28,8 @@ class RecommendationRead(BaseModel):
     assumptions: List[str] = Field(default_factory=list)
     is_verified: bool = False
     verifier_notes: Optional[str] = None
+    generation_mode: Optional[str] = "deterministic_fallback"
+    llm_model: Optional[str] = "rule_engine"
     created_at: str
 
     model_config = {"from_attributes": True}

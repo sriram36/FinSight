@@ -8,9 +8,22 @@ from backend.schemas.recommendation import (
     RecommendationRead,
     RecommendationConfig
 )
-from backend.services.recommendation_service import generate_recommendation
+from backend.services.recommendation_service import generate_recommendation, generate_portfolio_insights
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
+
+@router.get("/portfolio", response_model=List[RecommendationRead])
+def get_portfolio_insights_endpoint(
+    user_id: str = "default_user",
+    db=Depends(get_db)
+):
+    """
+    Returns a multi-dimensional portfolio of verified personal finance recommendations:
+    1. Top Discretionary Pace Outlier (System C)
+    2. Subscriptions & Recurring Commitments Audit
+    3. Goal Acceleration & Surplus Allocation
+    """
+    return generate_portfolio_insights(user_id=user_id, db=db)
 
 @router.post("/generate", response_model=RecommendationRead)
 def generate_recommendation_endpoint(

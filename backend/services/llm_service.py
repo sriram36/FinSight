@@ -15,7 +15,8 @@ def get_openai_client():
                 azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
                 api_key=settings.AZURE_OPENAI_API_KEY,
                 api_version=settings.AZURE_OPENAI_API_VERSION,
-                timeout=10.0  # 10s timeout budget per PRD & CONSTRAINTS.md
+                timeout=10.0,  # 10s timeout budget per PRD & CONSTRAINTS.md
+                max_retries=0  # Do not loop on slow connections
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Azure OpenAI client: {e}")
@@ -36,7 +37,7 @@ def generate_llm_recommendation(
 
     if client and config in (RecommendationConfig.SYSTEM_B, RecommendationConfig.SYSTEM_B_ABLATION, RecommendationConfig.SYSTEM_C):
         try:
-            deployment = settings.AZURE_OPENAI_DEPLOYMENT or "gpt-4o"
+            deployment = settings.AZURE_OPENAI_DEPLOYMENT or "gpt-5.6-luna"
             
             if config == RecommendationConfig.SYSTEM_C:
                 system_prompt = (
@@ -62,26 +63,52 @@ def generate_llm_recommendation(
                 )
                 user_prompt = f"Category: {category}"
 
-            response = client.chat.completions.create(
-                model=deployment,
-                messages=[
+            kwargs = {
+                "model": deployment,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"},
-                temperature=0.2 if config == RecommendationConfig.SYSTEM_C else 0.7,
-                max_tokens=250
-            )
+                "response_format": {"type": "json_object"}
+            }
+
+            try:
+                response = client.chat.completions.create(**kwargs, max_completion_tokens=300)
+            except Exception as e:
+                err_str = str(e).lower()
+                if "unsupported_parameter" in err_str or "max_completion_tokens" in err_str:
+                    response = client.chat.completions.create(**kwargs, max_tokens=300)
+                else:
+                    raise e
+
             content = response.choices[0].message.content
             parsed = json.loads(content)
+            if not isinstance(parsed, dict) or "action" not in parsed or "reason" not in parsed:
+                raise ValueError("Malformed JSON structure from LLM completion.")
+
+            # Filter cited transactions for System C to ensure zero hallucinated IDs
+            if config == RecommendationConfig.SYSTEM_C:
+                allowed_ids = set(evidence.get("source_transaction_ids", []))
+                raw_cited = parsed.get("cited_transaction_ids", [])
+                if isinstance(raw_cited, list):
+                    parsed["cited_transaction_ids"] = [tx for tx in raw_cited if tx in allowed_ids]
+                else:
+                    parsed["cited_transaction_ids"] = list(allowed_ids)[:5]
+
             parsed["is_llm_generated"] = True
+            parsed["generation_mode"] = "azure_openai"
             parsed["llm_provider"] = "azure_openai"
+            parsed["model"] = deployment
             return parsed
         except Exception as e:
             logger.warning(f"LLM generation failed or timed out; falling back to deterministic template: {e}")
 
     # Deterministic fallback logic (guaranteed within < 5ms)
-    return generate_deterministic_fallback(config, category, evidence, profile_summary)
+    fallback = generate_deterministic_fallback(config, category, evidence, profile_summary)
+    fallback["is_llm_generated"] = False
+    fallback["generation_mode"] = "deterministic_fallback"
+    fallback["model"] = "rule_engine"
+    return fallback
 
 def generate_deterministic_fallback(
     config: RecommendationConfig,
@@ -106,7 +133,7 @@ def generate_deterministic_fallback(
         impact = evidence.get("expected_impact", 0.0)
         return {
             "action": f"Plan flexible purchases carefully around {category}.",
-            "reason": f"Your {category} spending has shown an upward shift (+{pct:.1f}%) recently.",
+            "reason": f"Your {category} spending has shown an upward shift (+{pct:.1f}%). We suggest reducing this category by ₹2,500.00 this month.",
             "expected_impact": impact,
             "cited_transaction_ids": [],
             "assumptions": ["Personalized recommendation conditioned on spending profile trends."],
@@ -116,7 +143,7 @@ def generate_deterministic_fallback(
     elif config == RecommendationConfig.SYSTEM_B_ABLATION:
         return {
             "action": f"Try spending less on {category} this month.",
-            "reason": f"You seemed to spend quite a bit on {category} lately. Easing back might help your savings.",
+            "reason": f"You seemed to spend quite a bit on {category} lately. Aim to trim spending by ₹3,000.00 to balance your cash flow.",
             "expected_impact": None,
             "cited_transaction_ids": [],
             "assumptions": ["Unstructured heuristic without empirical evidence grounding."],

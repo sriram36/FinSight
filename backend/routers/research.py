@@ -31,9 +31,9 @@ def temporal_split():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.api_route("/benchmark", methods=["GET", "POST"])
-def configuration_benchmark():
+def configuration_benchmark(live_llm: bool = Query(False, description="Run live LLM evaluation across personas")):
     try:
-        return run_four_way_benchmark()
+        return run_four_way_benchmark(live_llm=live_llm)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

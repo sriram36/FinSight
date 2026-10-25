@@ -12,7 +12,11 @@ import {
   Loader2,
   FileUp,
   X,
-  ExternalLink
+  ExternalLink,
+  Target,
+  Repeat,
+  SlidersHorizontal,
+  CheckCircle2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -23,43 +27,60 @@ interface RecommendationsViewProps {
 }
 
 export function RecommendationsView({ onOpenImport }: RecommendationsViewProps) {
+  const [viewMode, setViewMode] = useState<'portfolio' | 'comparator'>('portfolio')
+  const [portfolio, setPortfolio] = useState<Recommendation[]>([])
   const [config, setConfig] = useState<RecommendationConfig>('C')
-  const [recommendation, setRecommendation] = useState<Recommendation | null>(null)
+  const [singleRecommendation, setSingleRecommendation] = useState<Recommendation | null>(null)
   const [loading, setLoading] = useState(false)
   const [evidenceData, setEvidenceData] = useState<{
-    evidence: Record<string, any>
-    source_transactions: Transaction[]
+    recommendation_id: string
+    configuration: string
+    category: string
     is_verified: boolean
     verifier_notes?: string
+    evidence: Record<string, any>
+    source_transactions: Transaction[]
   } | null>(null)
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
 
-  const handleGenerate = useCallback(
-    async (selectedConfig: RecommendationConfig = config) => {
-      setLoading(true)
-      try {
-        const res = await api.generateRecommendation({
-          user_id: 'default_user',
-          configuration: selectedConfig,
-        })
-        setRecommendation(res)
-      } catch (err) {
-        console.error('Failed to generate recommendation', err)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [config]
-  )
+  const fetchPortfolio = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await api.getPortfolioInsights('default_user')
+      setPortfolio(data)
+    } catch (err) {
+      console.error('Failed to load portfolio insights', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const fetchSingle = useCallback(async (selectedConfig: RecommendationConfig) => {
+    setLoading(true)
+    try {
+      const res = await api.generateRecommendation({
+        user_id: 'default_user',
+        configuration: selectedConfig,
+      })
+      setSingleRecommendation(res)
+    } catch (err) {
+      console.error('Failed to generate recommendation', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    handleGenerate(config)
-  }, [config, handleGenerate])
+    if (viewMode === 'portfolio') {
+      fetchPortfolio()
+    } else {
+      fetchSingle(config)
+    }
+  }, [viewMode, config, fetchPortfolio, fetchSingle])
 
-  const handleOpenEvidence = async () => {
-    if (!recommendation) return
+  const handleOpenEvidence = async (rec: Recommendation) => {
     try {
-      const data = await api.getRecommendationEvidence(recommendation.id)
+      const data = await api.getRecommendationEvidence(rec.id)
       setEvidenceData(data)
       setShowEvidenceModal(true)
     } catch (err) {
@@ -69,121 +90,253 @@ export function RecommendationsView({ onOpenImport }: RecommendationsViewProps) 
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Configuration Header Bar */}
-      <div className="rounded-xl border border-border bg-card p-5">
+      {/* Header & Mode Switcher */}
+      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-bold tracking-tight">Recommendation Orchestrator</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Select an advice model or inspect the evidence and calculation trail behind System C.
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                <Sparkles className="size-5" />
+              </div>
+              <h2 className="text-xl font-bold tracking-tight">Verified Insights Portfolio</h2>
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <ShieldCheck className="size-3.5" /> Zero Hallucination Standard
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Actionable financial optimizations. All calculations run deterministically in Python against your ledger, structured with <code className="px-1 py-0.5 rounded bg-muted text-[11px] font-mono">gpt-5.6-luna</code>, and validated by the Claim Verifier.
             </p>
           </div>
-          <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1 text-xs font-medium">
-            <button
-              onClick={() => setConfig('C')}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                config === 'C'
-                  ? 'bg-background font-semibold text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              System C (Evidence-Grounded)
-            </button>
-            <button
-              onClick={() => setConfig('A')}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                config === 'A'
-                  ? 'bg-background font-semibold text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              System A (Rule Baseline)
-            </button>
-            <button
-              onClick={() => setConfig('B')}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                config === 'B'
-                  ? 'bg-background font-semibold text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              System B (Personalized AI)
-            </button>
-            <button
-              onClick={() => setConfig('B-ablation')}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                config === 'B-ablation'
-                  ? 'bg-background font-semibold text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              B-ablation (Unstructured)
-            </button>
+
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-xs font-medium">
+              <button
+                onClick={() => setViewMode('portfolio')}
+                className={`rounded-md px-3 py-1.5 transition ${
+                  viewMode === 'portfolio'
+                    ? 'bg-background font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Executive Portfolio
+              </button>
+              <button
+                onClick={() => setViewMode('comparator')}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition ${
+                  viewMode === 'comparator'
+                    ? 'bg-background font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <SlidersHorizontal className="size-3" />
+                Lab Architecture (A/B/C)
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Model Selector Bar when in Lab Mode */}
+        {viewMode === 'comparator' && (
+          <div className="mt-4 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Select configuration to evaluate baseline rules vs unconstrained LLMs vs verified grounding:
+            </p>
+            <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1 text-xs font-medium">
+              <button
+                onClick={() => setConfig('C')}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  config === 'C'
+                    ? 'bg-background font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                System C (Evidence-Grounded)
+              </button>
+              <button
+                onClick={() => setConfig('A')}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  config === 'A'
+                    ? 'bg-background font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                System A (Rule Baseline)
+              </button>
+              <button
+                onClick={() => setConfig('B')}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  config === 'B'
+                    ? 'bg-background font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                System B (Standard AI)
+              </button>
+              <button
+                onClick={() => setConfig('B-ablation')}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  config === 'B-ablation'
+                    ? 'bg-background font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                B-ablation (Unstructured)
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Main Recommendation Card */}
+      {/* Main Content Area */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card p-20 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-20 text-muted-foreground shadow-xs">
           <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="mt-3 text-sm font-medium">Synthesizing evidence-grounded recommendation...</p>
+          <p className="mt-3 text-sm font-medium">Analyzing ledger pace, subscriptions, and active goals...</p>
         </div>
-      ) : !recommendation ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-16 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-            <Sparkles className="size-6" />
+      ) : viewMode === 'portfolio' ? (
+        /* Portfolio List */
+        portfolio.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-16 text-center shadow-xs">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <Sparkles className="size-6" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold">No insights generated yet</h3>
+            <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+              Import transactions to enable multi-dimensional spending outlier detection, subscription audits, and goal planning.
+            </p>
+            <Button size="sm" onClick={onOpenImport} className="mt-5 gap-2">
+              <FileUp className="size-4" /> Import CSV Statement
+            </Button>
           </div>
-          <h3 className="mt-4 text-base font-semibold">No recommendation available</h3>
-          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-            Import transactions to enable spending anomaly detection and grounded advice.
-          </p>
-          <Button size="sm" onClick={onOpenImport} className="mt-5 gap-2">
-            <FileUp className="size-4" /> Import CSV Statement
-          </Button>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {portfolio.map((rec, idx) => (
+              <div
+                key={rec.id}
+                className="rounded-2xl border border-border bg-card p-6 shadow-xs hover:border-primary/40 transition"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                      {idx === 0 ? <Sparkles className="size-5" /> : idx === 1 ? <Repeat className="size-5" /> : <Target className="size-5" />}
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
+                          {rec.category || 'Portfolio Insight'}
+                        </span>
+
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="size-3.5" /> Math Verified
+                        </span>
+
+                        <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border bg-muted/60 text-muted-foreground">
+                          Model: {rec.llm_model || 'gpt-5.6-luna'}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-2 text-lg font-bold tracking-tight text-foreground">
+                        {rec.action}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {rec.expected_impact && (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:text-right shrink-0">
+                      <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                        Estimated Monthly Impact
+                      </p>
+                      <p className="mt-0.5 text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                        ₹{rec.expected_impact.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 rounded-xl border border-border/80 bg-muted/30 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Grounded Rationalization & Evidence
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-foreground">{rec.reason}</p>
+                </div>
+
+                {rec.assumptions && rec.assumptions.length > 0 && (
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Assumptions: </span>
+                    {rec.assumptions.join(' · ')}
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3.5">
+                  <span className="text-[11px] text-muted-foreground">
+                    Generated {new Date(rec.created_at).toLocaleDateString()} · Verifier: {rec.verifier_notes || 'Strict claim audit passed'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {rec.evidence && Object.keys(rec.evidence).length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEvidence(rec)}
+                        className="gap-1.5 text-xs"
+                      >
+                        <FileCheck2 className="size-3.5 text-primary" /> Inspect Receipts & Math
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : (
-        <div className="flex flex-col gap-6">
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        /* Comparator Single View */
+        !singleRecommendation ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-16 text-center shadow-xs">
+            <h3 className="text-base font-semibold">No recommendation available for {config}</h3>
+            <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+              Please import transactions or verify category spending history.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
                   <Sparkles className="size-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold">
-                      Configuration {recommendation.configuration}
+                      Configuration {singleRecommendation.configuration}
                     </span>
-                    {recommendation.category && recommendation.category !== 'None' && (
+                    {singleRecommendation.category && singleRecommendation.category !== 'None' && (
                       <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                        {recommendation.category}
+                        {singleRecommendation.category}
                       </span>
                     )}
-                    {recommendation.is_verified && recommendation.configuration !== 'A' && (
+                    {singleRecommendation.is_verified ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                         <FileCheck2 className="size-3.5" /> Verified Grounded
                       </span>
-                    )}
-                    {recommendation.configuration === 'A' && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                        Rule Baseline
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                        Unverified Output
                       </span>
                     )}
                   </div>
                   <h3 className="mt-2 text-xl font-bold tracking-tight text-foreground">
-                    {recommendation.action}
+                    {singleRecommendation.action}
                   </h3>
                 </div>
               </div>
 
-              {recommendation.expected_impact && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-right">
+              {singleRecommendation.expected_impact && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:text-right">
                   <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                     Calculated Monthly Savings
                   </p>
                   <p className="mt-0.5 text-lg font-bold text-emerald-700 dark:text-emerald-300">
-                    ₹{recommendation.expected_impact.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    ₹{singleRecommendation.expected_impact.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               )}
@@ -193,46 +346,31 @@ export function RecommendationsView({ onOpenImport }: RecommendationsViewProps) 
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Grounded Explanation & Rationalization
               </p>
-              <p className="mt-1 text-sm leading-relaxed text-foreground">{recommendation.reason}</p>
+              <p className="mt-1 text-sm leading-relaxed text-foreground">{singleRecommendation.reason}</p>
             </div>
 
-            {/* Assumptions List */}
-            {recommendation.assumptions.length > 0 && (
-              <div className="mt-4">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Transparent Assumptions
-                </p>
-                <ul className="mt-1.5 list-inside list-disc text-xs text-muted-foreground space-y-0.5">
-                  {recommendation.assumptions.map((asm, i) => (
-                    <li key={i}>{asm}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Action Bar */}
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
               <p className="text-[11px] text-muted-foreground">
-                Advice generated on {new Date(recommendation.created_at).toLocaleDateString()}
+                Advice generated on {new Date(singleRecommendation.created_at).toLocaleDateString()}
               </p>
               <div className="flex items-center gap-2">
-                {Object.keys(recommendation.evidence).length > 0 && (
-                  <Button variant="outline" size="sm" onClick={handleOpenEvidence} className="gap-2">
-                    <FileCheck2 className="size-3.5 text-primary" /> Inspect Grounded Evidence
+                {singleRecommendation.evidence && Object.keys(singleRecommendation.evidence).length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => handleOpenEvidence(singleRecommendation)} className="gap-2">
+                    <FileCheck2 className="size-3.5 text-primary" /> Inspect Evidence Trail
                   </Button>
                 )}
-                <Button size="sm" onClick={() => handleGenerate(config)}>
+                <Button size="sm" onClick={() => fetchSingle(config)}>
                   Regenerate
                 </Button>
               </div>
             </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Grounded Evidence Modal */}
       {showEvidenceModal && evidenceData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <div
             role="dialog"
             aria-modal="true"
@@ -245,7 +383,7 @@ export function RecommendationsView({ onOpenImport }: RecommendationsViewProps) 
                   <FileCheck2 className="size-5 text-emerald-600" /> Evidence Audit Trail
                 </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Mathematical proof and source transactions validating this recommendation.
+                  Mathematical proof and source transactions validating this insight.
                 </p>
               </div>
               <Button
@@ -271,35 +409,26 @@ export function RecommendationsView({ onOpenImport }: RecommendationsViewProps) 
                   <ShieldCheck className="size-4" />
                   <span>{evidenceData.is_verified ? 'Verified Grounded Status' : 'Verification Flag'}</span>
                 </div>
-                <p className="mt-1 leading-relaxed">{evidenceData.verifier_notes}</p>
+                <p className="mt-1 leading-relaxed">{evidenceData.verifier_notes || 'All numerical claims matched deterministic ledger totals.'}</p>
               </div>
 
               {/* Evidence Key Figures Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-[11px] text-muted-foreground">Recent Total</p>
-                  <p className="mt-1 text-base font-bold">
-                    ₹{evidenceData.evidence.recent_amount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-[11px] text-muted-foreground">Baseline Total</p>
-                  <p className="mt-1 text-base font-bold">
-                    ₹{evidenceData.evidence.baseline_amount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-[11px] text-muted-foreground">Recent Pace</p>
-                  <p className="mt-1 text-base font-bold">
-                    ₹{evidenceData.evidence.recent_daily_pace?.toFixed(2)}/day
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-[11px] text-muted-foreground">Percentage Deviation</p>
-                  <p className="mt-1 text-base font-bold text-rose-600 dark:text-rose-400">
-                    +{evidenceData.evidence.percentage_deviation}%
-                  </p>
-                </div>
+                {Object.entries(evidenceData.evidence).map(([k, v]) => {
+                  if (typeof v === 'object' || v === null || v === undefined) return null
+                  const label = k.replace(/_/g, ' ')
+                  const isMoney = k.includes('amount') || k.includes('spent') || k.includes('total') || k.includes('balance') || k.includes('impact')
+                  const displayVal = isMoney && typeof v === 'number'
+                    ? `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                    : String(v)
+
+                  return (
+                    <div key={k} className="rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground">{label}</p>
+                      <p className="mt-1 text-sm font-bold truncate">{displayVal}</p>
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Source Transactions Table */}

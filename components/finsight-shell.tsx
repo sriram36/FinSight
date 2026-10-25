@@ -24,6 +24,7 @@ import {
   Upload,
   UserRound,
   WalletCards,
+  MessageSquareText,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -34,16 +35,18 @@ import { RecommendationsView } from '@/components/views/recommendations-view'
 import { SimulateView } from '@/components/views/simulate-view'
 import { GoalsView } from '@/components/views/goals-view'
 import { ResearchView } from '@/components/views/research-view'
+import { ChatView } from '@/components/views/chat-view'
 import { ImportModal } from '@/components/import-modal'
 import { SettingsModal } from '@/components/settings-modal'
 
 const navItems = [
   { label: 'Overview', icon: LayoutDashboard },
+  { label: 'Ask FinSight', icon: MessageSquareText },
+  { label: 'Verified Insights', icon: Sparkles },
   { label: 'Transactions', icon: WalletCards },
-  { label: 'Profile', icon: UserRound },
-  { label: 'Recommendations', icon: Sparkles },
-  { label: 'Simulate', icon: BarChart3 },
   { label: 'Goals', icon: Target },
+  { label: 'Simulate', icon: BarChart3 },
+  { label: 'Profile', icon: UserRound },
 ]
 
 export function FinSightShell() {
@@ -82,12 +85,15 @@ export function FinSightShell() {
             onNavigateTab={tab => setActiveView(tab)}
           />
         )
+      case 'Ask FinSight':
+        return <ChatView />
+      case 'Verified Insights':
+      case 'Recommendations':
+        return <RecommendationsView onOpenImport={() => setShowImport(true)} />
       case 'Transactions':
         return <TransactionsView onOpenImport={() => setShowImport(true)} />
       case 'Profile':
         return <ProfileView onOpenImport={() => setShowImport(true)} />
-      case 'Recommendations':
-        return <RecommendationsView onOpenImport={() => setShowImport(true)} />
       case 'Simulate':
         return <SimulateView />
       case 'Goals':

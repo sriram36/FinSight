@@ -189,3 +189,21 @@ def test_llm_service_with_mock():
         assert res["is_llm_generated"] is True
         assert res["llm_provider"] == "azure_openai"
         assert res["expected_impact"] == 500.0
+
+def test_portfolio_insights_generation(db, setup_rec_data):
+    from backend.services.recommendation_service import generate_portfolio_insights
+    cursor = db.cursor()
+    cursor.execute("""
+    INSERT INTO goals (id, user_id, title, target_amount, current_amount, target_date, status, created_at)
+    VALUES ('goal_rec_test', 'rec_user', 'Emergency Reserve', 50000.0, 15000.0, '2026-12-31', 'active', '2026-01-01T00:00:00Z')
+    ON CONFLICT(id) DO NOTHING
+    """)
+    db.commit()
+
+    insights = generate_portfolio_insights(user_id="rec_user", db=db)
+    assert len(insights) >= 1
+    for ins in insights:
+        assert ins.user_id == "rec_user"
+        assert ins.is_verified is True
+        assert ins.action != ""
+        assert ins.reason != ""

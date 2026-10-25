@@ -15,3 +15,11 @@ services:
         value: "https://finsight-wine-tau.vercel.app,http://localhost:3000"
       - key: DATABASE_URL
         value: ""
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT
+        value: "gpt-5.6-luna"
+      - key: AZURE_OPENAI_API_VERSION
+        value: "2024-02-15-preview"

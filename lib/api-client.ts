@@ -6,7 +6,8 @@ import {
   Recommendation,
   AffordabilityResponse,
   Goal,
-  CategoryPreference
+  CategoryPreference,
+  FinancialChatResponse
 } from './types'
 
 const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
@@ -163,6 +164,9 @@ export const api = {
   getRecommendations: (userId: string = 'default_user'): Promise<Recommendation[]> =>
     request<Recommendation[]>(`/recommendations?user_id=${userId}`),
 
+  getPortfolioInsights: (userId: string = 'default_user'): Promise<Recommendation[]> =>
+    request<Recommendation[]>(`/recommendations/portfolio?user_id=${userId}`),
+
   getRecommendationEvidence: (id: string, userId: string = 'default_user') =>
     request<{
       recommendation_id: string
@@ -173,6 +177,13 @@ export const api = {
       evidence: Record<string, any>
       source_transactions: Transaction[]
     }>(`/recommendations/${id}/evidence?user_id=${userId}`),
+
+  // Conversational Financial Intelligence (Ask FinSight)
+  queryChat: (message: string, userId: string = 'default_user'): Promise<FinancialChatResponse> =>
+    request<FinancialChatResponse>('/chat/query', {
+      method: 'POST',
+      body: JSON.stringify({ message, user_id: userId }),
+    }),
 
   // Scenarios / Affordability
   simulateAffordability: (data: {

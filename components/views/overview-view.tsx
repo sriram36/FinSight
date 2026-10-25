@@ -337,14 +337,20 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
             </div>
           </div>
 
-          <div className="p-5 pt-0">
+          <div className="p-5 pt-0 flex gap-2">
             <Button
-              onClick={() => onNavigateTab('Recommendations')}
+              onClick={() => onNavigateTab('Verified Insights')}
               variant="outline"
-              className="w-full gap-2 text-xs"
+              className="flex-1 gap-1.5 text-xs"
             >
-              <Sparkles className="size-3.5" />
-              Explore All 4 Configurations
+              <Sparkles className="size-3.5 text-primary" />
+              View Verified Insights
+            </Button>
+            <Button
+              onClick={() => onNavigateTab('Ask FinSight')}
+              className="flex-1 gap-1.5 text-xs"
+            >
+              Ask FinSight AI
             </Button>
           </div>
         </section>

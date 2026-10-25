@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 
 from backend.schemas.recommendation import RecommendationConfig
 from backend.services.verifier_service import verify_recommendation_claims
+from backend.services.llm_service import generate_llm_recommendation, generate_deterministic_fallback
 
 DATASET_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "public", "sample_personal_ledger.csv")
 DATASET_SHA256 = "3a3893697b6be0daf3d8f1f56eb60de185ad79c7f26bbf7ce1c2be47c441385a"
@@ -208,7 +209,7 @@ def evaluate_persona_metrics(user_id: str, user_rows: List[Dict[str, Any]]) -> O
         "split_date": split_date
     }
 
-def run_four_way_benchmark() -> List[Dict[str, Any]]:
+def run_four_way_benchmark(live_llm: bool = False) -> List[Dict[str, Any]]:
     """
     Computes benchmark metrics dynamically by evaluating configurations A, B, B-ablation, and C
     across all personas in the synthetic holdout dataset.
@@ -303,8 +304,6 @@ def run_four_way_benchmark() -> List[Dict[str, Any]]:
             stats["A"]["verified"] += 1
 
         # System B (Personalized AI):
-        # Conditioned on overall profile deltas. Without protected category gating,
-        # it targets the raw highest deviation across all categories (which may be protected!).
         top_overall = all_cats[0] if all_cats else None
         if top_overall and top_overall["is_protected"]:
             stats["B"]["protected_violations"] += 1
@@ -321,12 +320,22 @@ def run_four_way_benchmark() -> List[Dict[str, Any]]:
             "recent_amount": top_overall["recent_amount"] if top_overall else 0.0,
             "monthly_impact": top_overall["monthly_impact"] if top_overall else 0.0
         }
-        # In unconstrained LLM generation, arbitrary rounded figures fail verification
-        if u in ("syn_user_02", "syn_user_06", "syn_user_09"):
-            text_b = f"Plan flexible purchases carefully around {target_cat_b}. Try cutting your expenses by ₹2,500.00 this month."
-        else:
-            text_b = f"Plan flexible purchases carefully around {target_cat_b}. Your {target_cat_b} spending has shown an upward shift (+{ev_b['percentage_deviation']:.1f}%) recently."
 
+        if live_llm:
+            rec_b = generate_llm_recommendation(
+                RecommendationConfig.SYSTEM_B,
+                target_cat_b,
+                ev_b,
+                {"baseline_days": p["b_days"], "recent_days": p["h_days"]}
+            )
+        else:
+            rec_b = generate_deterministic_fallback(
+                RecommendationConfig.SYSTEM_B,
+                target_cat_b,
+                ev_b,
+                {"baseline_days": p["b_days"], "recent_days": p["h_days"]}
+            )
+        text_b = f"{rec_b.get('action', '')} {rec_b.get('reason', '')}"
         v_b = verify_recommendation_claims(text_b, ev_b, tolerance=0.01)
         if v_b.is_verified:
             stats["B"]["verified"] += 1
@@ -340,14 +349,23 @@ def run_four_way_benchmark() -> List[Dict[str, Any]]:
             stats["B-ablation"]["protected_violations"] += 1
 
         if rule_selected and top_eligible and top_eligible["category"] == rule_selected["category"]:
-            if u not in ("syn_user_04", "syn_user_07", "syn_user_08"):
-                stats["B-ablation"]["agreed"] += 1
+            stats["B-ablation"]["agreed"] += 1
 
-        if u in ("syn_user_01", "syn_user_03", "syn_user_05", "syn_user_08"):
-            text_b_abl = f"You seemed to spend ₹3,000.00 more on {target_cat_b} lately. Try cutting down."
+        if live_llm:
+            rec_b_abl = generate_llm_recommendation(
+                RecommendationConfig.SYSTEM_B_ABLATION,
+                target_cat_b,
+                {},
+                {"baseline_days": p["b_days"], "recent_days": p["h_days"]}
+            )
         else:
-            text_b_abl = f"You seemed to spend quite a bit on {target_cat_b} lately. Easing back might help your savings."
-        
+            rec_b_abl = generate_deterministic_fallback(
+                RecommendationConfig.SYSTEM_B_ABLATION,
+                target_cat_b,
+                {},
+                {"baseline_days": p["b_days"], "recent_days": p["h_days"]}
+            )
+        text_b_abl = f"{rec_b_abl.get('action', '')} {rec_b_abl.get('reason', '')}"
         v_b_abl = verify_recommendation_claims(text_b_abl, {}, tolerance=0.01)
         if v_b_abl.is_verified:
             stats["B-ablation"]["verified"] += 1
@@ -355,9 +373,9 @@ def run_four_way_benchmark() -> List[Dict[str, Any]]:
             stats["B-ablation"]["hallucinated"] += 1
 
         # System C (Evidence-Grounded FinSight):
-        # Guaranteed protected category gating (0 violations) and strict claim verification
         target_cat_c = top_eligible["category"] if top_eligible else "None"
-        stats["C"]["agreed"] += 1  # Matches ground truth discretionary prioritization
+        if rule_selected and target_cat_c == rule_selected["category"]:
+            stats["C"]["agreed"] += 1
 
         ev_c = {
             "category": target_cat_c,
@@ -372,11 +390,21 @@ def run_four_way_benchmark() -> List[Dict[str, Any]]:
             "transaction_count": top_eligible["transaction_count"] if top_eligible else 0,
             "source_transaction_ids": top_eligible["source_transaction_ids"] if top_eligible else []
         }
-        text_c = (
-            f"Consider capping {target_cat_c} spending by ₹{ev_c['monthly_impact']:,.2f}/month to return to baseline pace. "
-            f"Your recent {target_cat_c} spending pace is ₹{ev_c['recent_daily_pace']:,.2f}/day, which is "
-            f"{ev_c['percentage_deviation']:.1f}% above your historical baseline pace of ₹{ev_c['baseline_daily_pace']:,.2f}/day."
-        )
+        if live_llm:
+            rec_c = generate_llm_recommendation(
+                RecommendationConfig.SYSTEM_C,
+                target_cat_c,
+                ev_c,
+                {"baseline_days": p["b_days"], "recent_days": p["h_days"]}
+            )
+        else:
+            rec_c = generate_deterministic_fallback(
+                RecommendationConfig.SYSTEM_C,
+                target_cat_c,
+                ev_c,
+                {"baseline_days": p["b_days"], "recent_days": p["h_days"]}
+            )
+        text_c = f"{rec_c.get('action', '')} {rec_c.get('reason', '')}"
         v_c = verify_recommendation_claims(text_c, ev_c, tolerance=0.01)
         if v_c.is_verified:
             stats["C"]["verified"] += 1

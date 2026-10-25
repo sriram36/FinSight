@@ -82,7 +82,7 @@ export type RecommendationConfig = 'A' | 'B' | 'B-ablation' | 'C'
 export interface Recommendation {
   id: string
   user_id: string
-  configuration: RecommendationConfig
+  configuration: RecommendationConfig | string
   category?: string | null
   action: string
   reason: string
@@ -91,7 +91,27 @@ export interface Recommendation {
   assumptions: string[]
   is_verified: boolean
   verifier_notes?: string | null
+  generation_mode?: 'azure_openai' | 'deterministic_fallback' | string | null
+  llm_model?: string | null
   created_at: string
+}
+
+export interface FinancialChatResponse {
+  user_id: string
+  query: string
+  intent: string
+  category?: string | null
+  target_amount?: number | null
+  reply: string
+  is_verified: boolean
+  verifier_status: 'passed' | 'failed' | 'fallback_used' | string
+  verifier_notes?: string | null
+  generation_mode: 'azure_openai' | 'deterministic_fallback' | string
+  model_used: string
+  facts: Record<string, any>
+  cited_transactions: Transaction[]
+  suggested_followups: string[]
+  timestamp: string
 }
 
 export interface AffordabilityGoalImpact {
