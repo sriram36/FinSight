@@ -4,14 +4,31 @@
   <p><strong>Evidence-grounded personal finance decision support and reproducible research evaluation platform.</strong></p>
 
   <p>
+    <a href="https://finsight-wine-tau.vercel.app/"><img src="https://img.shields.io/badge/Live%20Demo-Vercel%20Frontend-black?style=for-the-badge&logo=vercel" alt="Live Demo" /></a>
+    <a href="https://finsight-api-d84z.onrender.com/docs"><img src="https://img.shields.io/badge/Live%20API-Render%20FastAPI-46E3B7?style=for-the-badge&logo=render&logoColor=black" alt="Live API" /></a>
+  </p>
+
+  <p>
     <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-16.4-black?logo=next.js" alt="Next.js 16" /></a>
     <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
-    <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.14%2B-blue?logo=python&logoColor=white" alt="Python" /></a>
-    <a href="https://sqlite.org"><img src="https://img.shields.io/badge/Database-SQLite3-003B57?logo=sqlite&logoColor=white" alt="SQLite" /></a>
-    <a href="https://docs.pytest.org"><img src="https://img.shields.io/badge/Tests-30%20Passed-brightgreen?logo=pytest&logoColor=white" alt="Pytest" /></a>
+    <a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/Database-PostgreSQL%20%26%20SQLite-336791?logo=postgresql&logoColor=white" alt="PostgreSQL & SQLite" /></a>
+    <a href="https://docs.pytest.org"><img src="https://img.shields.io/badge/Tests-34%20Passed-brightgreen?logo=pytest&logoColor=white" alt="Pytest" /></a>
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   </p>
 </div>
+
+---
+
+## 📚 Deep-Dive Technical Documentation
+
+For an exhaustive examination of the platform's mathematics, architecture, and empirical methodology, consult the dedicated guides:
+
+| Document | Focus & Highlights |
+| :--- | :--- |
+| **[System Architecture & Core Invariants](docs/ARCHITECTURE.md)** | Period-normalized math ($B/D_b \times D_r$), zero-baseline safety, claim verifier AST parser, 4-tier recommendation engine. |
+| **[PersonaLedger & Synthetic Research Lab](docs/RESEARCH_LAB.md)** | 1,000-row synthetic benchmark, 10 financial personas, zero-leakage 70/30 temporal holdout, $+150\%$ controlled perturbation protocol. |
+| **[REST API Reference Specification](docs/API_REFERENCE.md)** | Complete endpoint specifications, request/response schemas, query parameters, and error codes for all 14 endpoints. |
+| **[Production Deployment Handbook](docs/DEPLOYMENT_GUIDE.md)** | Step-by-step guides for All-in-One Docker on Render, Vercel edge deployment, Docker Compose, and environment variables. |
 
 ---
 
@@ -19,9 +36,11 @@
 
 * **Short Description:**
   > Evidence-grounded personal finance decision support platform with deterministic math, strict claim verification, and synthetic research evaluation.
-* **Website:** `https://github.com/sriram36/FinSight`
+* **Live Web App:** [https://finsight-wine-tau.vercel.app/](https://finsight-wine-tau.vercel.app/)
+* **Live API & OpenAPI Docs:** [https://finsight-api-d84z.onrender.com/docs](https://finsight-api-d84z.onrender.com/docs)
+* **GitHub Repository:** [https://github.com/sriram36/FinSight](https://github.com/sriram36/FinSight)
 * **Suggested Topics / Tags:**
-  `personal-finance` · `fintech` · `ai-finance` · `claim-verification` · `evidence-grounded` · `fastapi` · `nextjs16` · `react19` · `sqlite` · `reproducible-research` · `synthetic-data` · `decision-support`
+  `personal-finance` · `fintech` · `ai-finance` · `claim-verification` · `evidence-grounded` · `fastapi` · `nextjs16` · `react19` · `postgresql` · `sqlite` · `reproducible-research` · `synthetic-data` · `docker`
 
 ---
 
@@ -147,18 +166,17 @@ docker compose up --build -d
 
 ### Option 2: Cloud Deployment (Vercel + Render / Railway / Fly.io)
 
-#### A. Deploy Backend (FastAPI) on Render / Railway / Fly.io:
+#### A. Deploy Backend (FastAPI with Docker or Python) on Render:
 1. Create a new Web Service pointing to `https://github.com/sriram36/FinSight`.
-2. Configure build & start commands:
-   - **Build Command:** `pip install -r backend/requirements.txt`
-   - **Start Command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+2. **Environment:** Choose **Docker** (Render uses the root `Dockerfile` or `Dockerfile.backend` automatically).
+   *(Alternatively, choose **Python** with build command `pip install -r backend/requirements.txt` and start command `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`)*.
 3. Set Environment Variables:
    ```env
    CORS_ORIGINS=https://your-frontend-domain.vercel.app
    APP_ENV=production
-   DATABASE_URL=sqlite:///./finsight.db
+   DATABASE_URL=postgres://finsight_user:password@dpg-xxx:5432/finsight
    ```
-4. Attach a persistent disk / volume if using SQLite on Render/Fly to preserve transactions across restarts.
+   *(Supports both Render PostgreSQL and SQLite).*
 
 #### B. Deploy Frontend (Next.js) on Vercel:
 1. Import `https://github.com/sriram36/FinSight` into Vercel.
