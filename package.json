@@ -1,6 +1,23 @@
 {
   "name": "finsight-ai",
   "version": "0.1.0",
+  "description": "Evidence-grounded personal finance decision support and reproducible research evaluation platform.",
+  "keywords": [
+    "personal-finance",
+    "fintech",
+    "ai-finance",
+    "claim-verification",
+    "evidence-grounded",
+    "fastapi",
+    "nextjs16",
+    "sqlite",
+    "reproducible-research"
+  ],
+  "homepage": "https://github.com/sriram36/FinSight",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sriram36/FinSight.git"
+  },
   "private": true,
   "scripts": {
 
