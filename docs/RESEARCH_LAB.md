@@ -1,70 +1,102 @@
-# PersonaLedger & Synthetic Research Lab
+# Empirical Research Protocol & PersonaLedger Benchmark
 
-The **FinSight AI Synthetic Research Lab** provides an empirical platform for evaluating financial recommendation engines, LLM hallucination rates, and anomaly detection sensitivity under rigorous, zero-leakage academic standards.
-
----
-
-## 1. PersonaLedger Synthetic Dataset
-
-`PersonaLedger` is a deterministic synthetic financial ledger dataset designed for zero-leakage academic benchmarking:
-
-- **Row Count:** Exactly 1,000 transaction records.
-- **Personas:** 10 diverse financial personas (e.g., *frugal saver*, *tech enthusiast*, *freelance designer*, *family budgeter*).
-- **Temporal Horizon:** 365 days of continuous time-series data.
-- **Reproducibility Seed:** Seed `42` ensures identical dataset generation across any environment.
-- **Reference File:** Stored at [`public/sample_personal_ledger.csv`](../public/sample_personal_ledger.csv).
-
-### Persona Archetypes
-1. **P01 - Conservative Saver:** High income, minimal discretionary dining, aggressive savings rate.
-2. **P02 - Urban Commuter:** Frequent rideshare transactions, high dining out, variable transit expenses.
-3. **P03 - Digital Nomad:** Variable income cycles, frequent travel accommodations, recurring cloud subscriptions.
-4. **P04 - Healthcare Focused:** Fixed prescription schedules, recurring wellness and medical therapy payments.
-5. **P05 - Young Professional:** Bi-weekly payroll, student loan payments, weekend leisure outings.
-6. **P06 - Family Household:** High grocery expenses, seasonal apparel, utility spikes.
-7. **P07 - Freelance Creative:** Irregular lump-sum deposits, high software subscription overhead.
-8. **P08 - Student Budget:** Tight monthly limits, campus cafeteria runs, occasional scholarship stipends.
-9. **P09 - High-Earner Tech:** High disposable income, premium dining, hardware purchases.
-10. **P10 - Transition Period:** Recent job switch, fluctuating moving costs, temporary living expenses.
+The FinSight AI Research Laboratory provides a standardized, reproducible experimental framework for evaluating financial recommendation engines, numeric hallucination rates, and anomaly detection sensitivity under strict zero-leakage conditions.
 
 ---
 
-## 2. Zero-Leakage 70/30 Temporal Holdout Split
+## 1. Dataset Provenance: PersonaLedger
 
-Academic evaluation of financial recommendation systems often suffers from **temporal data leakage**, where future transaction patterns inadvertently bias historical baselines. 
+`PersonaLedger` is a synthetic financial ledger dataset designed to eliminate privacy exposure while maintaining realistic consumer spending characteristics across multiple socioeconomic cohorts.
 
-FinSight AI strictly enforces a chronological holdout partition:
+### 1.1 Generation Parameters
+- **Observation Count:** 1,000 discrete transaction records.
+- **Temporal Horizon:** 365 calendar days.
+- **Cohort Distribution:** 10 archetypal consumer personas (100 transactions each).
+- **Determinism:** Governed by random seed `42` to guarantee exact bitwise reproducibility across platforms.
+- **Reference Artifact:** [`public/sample_personal_ledger.csv`](../public/sample_personal_ledger.csv).
 
-$$\max(\text{Baseline Dates}) < \min(\text{Holdout Dates})$$
+### 1.2 Persona Taxonomy
+1. **Conservative Saver:** High liquidity margin, low discretionary consumption, automated savings flows.
+2. **Urban Commuter:** Daily micro-transactions, elevated transit and dynamic rideshare expenses.
+3. **Digital Nomad:** Multi-currency accommodations, variable income frequency, recurring SaaS overhead.
+4. **Healthcare Focused:** Inflexible medication schedules, recurring therapy and insurance disbursements.
+5. **Young Professional:** Regular bi-weekly salary, education loan amortizations, weekend hospitality spend.
+6. **Family Household:** High grocery variance, seasonal educational/apparel spikes, elevated utilities.
+7. **Freelance Creative:** High-variance lump-sum receivables, irregular working-capital outflows.
+8. **Student Budget:** Fixed scholarship/stipend allowances, low discretionary spending ceilings.
+9. **High-Earner Tech:** High disposable margin, premium electronics acquisition, experiential hospitality.
+10. **Transition Period:** Recent employment relocation, temporary residential costs, moving expenses.
+
+---
+
+## 2. Temporal Partitioning & Leakage Prevention
+
+A primary failure mode in machine learning evaluations of financial systems is **temporal data leakage**, where models or baseline statistics incorporate future information unavailable at the decision timestamp.
+
+### 2.1 Formal Partition Contract
+Let $\mathcal{T} = \{t_1, t_2, \dots, t_N\}$ represent the set of all transactions ordered chronologically by timestamp $\tau(t_i)$:
+
+$$\mathcal{T}_{\text{baseline}} = \{t_i \mid i \le 0.70 \times N\}$$
+
+$$\mathcal{T}_{\text{holdout}} = \{t_i \mid i > 0.70 \times N\}$$
+
+The partition is validated by verifying that no temporal overlap exists:
+
+$$\max_{t \in \mathcal{T}_{\text{baseline}}} \tau(t) < \min_{t \in \mathcal{T}_{\text{holdout}}} \tau(t)$$
+
+The endpoint `POST /research/split` executes this check deterministically, returning the exact date ranges and transaction counts for both partitions.
+
+---
+
+## 3. Evaluation Metrics & Benchmark Criteria
+
+The platform evaluates the four recommendation configurations across four primary dimensions:
+
+### 3.1 Claim Verification Rate (CVR)
+The proportion of numerical statements in the recommendation that exactly match verifiable records in the evidence payload within the 1.5% margin $\epsilon$:
+
+$$\text{CVR} = \frac{|\{c \in \mathcal{C} \mid \exists e \in \mathcal{E} \text{ s.t. } |c - e| / \max(|e|, 10^{-6}) \le 0.015\}|}{|\mathcal{C}|}$$
+
+Where $\mathcal{C}$ is the set of extracted monetary tokens and $\mathcal{E}$ is the set of ground-truth evidence values.
+
+### 3.2 Evidence Grounding Precision (EGP)
+The proportion of proposed actions that explicitly link to valid, identifiable source transaction identifiers:
+
+$$\text{EGP} = \frac{|\mathcal{A}_{\text{grounded}}|}{|\mathcal{A}_{\text{total}}|}$$
+
+### 3.3 Protected Invariant Violation Rate (PIVR)
+The frequency with which an engine proposes spending cuts or budget contractions in user-designated protected categories:
+
+$$\text{PIVR} = \frac{|\{a \in \mathcal{A} \mid \text{category}(a) \in \mathcal{P}_{\text{protected}}\}|}{|\mathcal{A}|}$$
+
+FinSight AI enforces $\text{PIVR} = 0.0$ as a strict system constraint.
+
+---
+
+## 4. Controlled Perturbation Experiment (+150% Shock)
+
+To measure the sensitivity of the recommendation pipelines to genuine behavioral shifts versus noise, the platform executes a controlled anomaly injection protocol:
 
 ```
-0% ─────────────────────────── 70% ─────────────────────────── 100%
-[     Historical Baseline Window     ][    Evaluation Holdout Window    ]
-         (700 Transactions)                    (300 Transactions)
-  Used to establish category pacing         Used strictly for recommendation
-    and spending baseline metrics                  accuracy assessment
+[ Unperturbed Holdout (300 txs) ]
+               │
+               ▼
+   Random Discretionary Target Selection (e.g. "Dining")
+               │
+               ▼
+   Multiply Target Amounts by 2.50 (+150% Inflation)
+               │
+               ▼
+[ Perturbed Holdout Window ] ──► Re-run Benchmark Evaluation
+                                      │
+                                      ▼
+                        Sensitivity & Grounding Assessment
 ```
 
-- **Partition Audit:** The endpoint `POST /research/split` verifies that no transaction in the holdout partition possesses a timestamp equal to or prior to the latest transaction in the baseline partition.
-
----
-
-## 3. Four-Way Comparative Benchmark
-
-The research laboratory evaluates the four recommendation configurations against the PersonaLedger holdout window:
-
-| Evaluation Metric | System A (Rules) | System B (Profile AI) | System B-Ablation (Heuristic) | System C (Grounded AI) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Claim Verification Rate** | 100.0% | 100.0% | 0.0% | **100.0%** |
-| **Evidence Grounding** | Category Sum | Profile Delta | None (0 citations) | **Itemized Tx IDs** |
-| **Protected Invariant Adherence** | 100.0% | 100.0% | 100.0% | **100.0%** |
-| **Numeric Hallucination Rate** | 0.0% | 0.0% | 85.0% | **0.0%** |
-
----
-
-## 4. Controlled Perturbation Protocol (+150% Shock)
-
-To test whether the recommendation engine detects genuine financial behavior shifts versus random variance, the platform includes an automated perturbation experiment runner:
-
-1. **Anomaly Injection:** The runner randomly selects an active discretionary category in the holdout window and inflates its transaction amounts by $+150\%$.
-2. **Re-Evaluation:** The 4 systems are re-executed against the perturbed ledger.
-3. **Detection Verification:** System C and System A must identify the perturbed category as the primary anomaly and propose targeted curtailment recommendations anchored by the inflated transaction receipts.
+### Protocol Steps:
+1. **Target Selection:** A non-protected discretionary spending category active in the holdout window is selected at random.
+2. **Shock Injection:** Every transaction within that category in $\mathcal{T}_{\text{holdout}}$ is scaled by $+150\%$ ($a_{\text{new}} = 2.5 \times a_{\text{old}}$).
+3. **Execution:** All four systems re-analyze the holdout partition.
+4. **Validation:** 
+   - Systems A and C must detect the perturbed category as the primary anomaly.
+   - System C must cite the inflated transaction IDs in its evidence payload and accurately reflect the increased monthly impact without hallucinating numbers.

@@ -1,74 +1,80 @@
-# FinSight AI: Production Deployment Handbook
+# Production Deployment Handbook
 
-This guide details deployment options for **FinSight AI**, with a special focus on zero-cost cloud hosting using **Render** (All-in-One Docker Backend with embedded PostgreSQL) and **Vercel** (Next.js Frontend).
+This runbook specifies operational deployment procedures for FinSight AI across cloud hosting (Render and Vercel) and local containerized infrastructure.
 
 ---
 
-## 1. Cloud Architecture (Live Environments)
+## 1. Live Deployment Topology
 
-- **Frontend (Vercel):** [https://finsight-wine-tau.vercel.app/](https://finsight-wine-tau.vercel.app/)
-- **Backend (Render):** [https://finsight-api-d84z.onrender.com/](https://finsight-api-d84z.onrender.com/)
+- **Frontend Client (Vercel):** [https://finsight-wine-tau.vercel.app/](https://finsight-wine-tau.vercel.app/)
+- **Backend Service (Render):** [https://finsight-api-d84z.onrender.com/](https://finsight-api-d84z.onrender.com/)
 
 ```
-                 Internet
-                    │
-        ┌───────────┴───────────┐
-        ▼                       ▼
-┌──────────────────┐    ┌───────────────────────────────────┐
-│ Vercel           │    │ Render                            │
-│ Next.js 16 Edge  │    │ Single Docker Web Service         │
-│ (React 19 App)   │    │ ├── Uvicorn FastAPI Server ($PORT)│
-└─────────┬────────┘    │ └── Embedded PostgreSQL 15 Daemon │
-          │             └───────────────────────────────────┘
-          │ REST / JSON (NEXT_PUBLIC_API_BASE_URL)
-          └─────────────────────►
+               Client Traffic (HTTPS)
+                         │
+                         ▼
+             [ Vercel: Next.js 16 Edge ]
+                         │
+                         │ REST / JSON (NEXT_PUBLIC_API_BASE_URL)
+                         ▼
+             [ Render: Docker Web Service ]
+                 ├── Uvicorn HTTP Server ($PORT)
+                 └── Embedded PostgreSQL 15 Daemon (127.0.0.1:5432)
 ```
 
 ---
 
-## 2. All-in-One Backend Container on Render
+## 2. All-in-One Backend Deployment (Render)
 
-The backend utilizes a self-contained Docker image ([Dockerfile](../Dockerfile)) that bundles **both** PostgreSQL 15 and Python/FastAPI into a single process tree governed by [entrypoint.sh](../entrypoint.sh).
+The backend is packaged as a unified Docker image (`Dockerfile`) encapsulating both the PostgreSQL 15 relational engine and the Python FastAPI application.
 
-### Deployment Steps:
-1. Open [Render Dashboard](https://dashboard.render.com).
-2. Select your Web Service: `finsight-api-d84z`.
-3. In **Settings** → **Build & Deploy**:
+### 2.1 Configuration Runbook
+1. Access the [Render Dashboard](https://dashboard.render.com).
+2. Select target Web Service: `finsight-api-d84z`.
+3. Navigate to **Settings** → **Build & Deploy**:
    - **Environment:** `Docker`
    - **Dockerfile Path:** `./Dockerfile`
-   - **Docker Context:** `.`
-4. In **Environment**:
-   - `APP_ENV`: `production`
-   - `CORS_ORIGINS`: `https://finsight-wine-tau.vercel.app,http://localhost:3000` *(or `*`)*
-   - `DATABASE_URL`: *(Leave blank to use the internal embedded PostgreSQL, or provide an external PostgreSQL URL)*
-5. Click **Manual Deploy** → **Deploy latest commit**.
+   - **Docker Context Directory:** `.`
+4. Navigate to **Environment** tab and configure:
 
-### Bootstrapping Lifecycle:
-1. Container starts and invokes `/app/entrypoint.sh`.
-2. PostgreSQL server starts via `/etc/init.d/postgresql start`.
-3. The script waits for database socket readiness via `pg_isready`.
-4. Role `finsight_user` and database `finsight` are idempotently created.
-5. Uvicorn binds to the dynamic `$PORT` injected by Render.
-6. FastAPI startup hook calls `init_db()`, executing `seed_demo_data()` to populate 52 transactions, 3 goals, and 4 recommendations if the database is fresh.
+| Key | Recommended Value | Purpose |
+| :--- | :--- | :--- |
+| `APP_ENV` | `production` | Enforces production runtime logging and optimizations. |
+| `CORS_ORIGINS` | `https://finsight-wine-tau.vercel.app,http://localhost:3000` | Whitelists the Vercel frontend origin. Can use `*` for broad access. |
+| `DATABASE_URL` | *(Leave empty)* | When omitted or pointing to `localhost`, starts the embedded PostgreSQL server. |
+
+5. Trigger **Manual Deploy** → **Deploy latest commit**.
+
+### 2.2 Container Bootstrapping Sequence
+1. The container executes `/app/entrypoint.sh`.
+2. The PostgreSQL service daemon starts via `/etc/init.d/postgresql start`.
+3. Socket availability is polled via `pg_isready` (maximum 30-second timeout).
+4. The database `finsight` and user role `finsight_user` (`finsight_secret`) are idempotently provisioned.
+5. Uvicorn binds to `0.0.0.0:$PORT` using the port dynamically allocated by Render.
+6. FastAPI's lifespan hook executes `init_db()`. If tables are unpopulated, `seed_demo_data()` seeds 52 transactions, 3 goals, and 4 comparative recommendations.
 
 ---
 
-## 3. Frontend Deployment on Vercel
+## 3. Frontend Client Deployment (Vercel)
 
 The frontend is built on **Next.js 16** with Turbopack and React 19.
 
-### Deployment Steps:
-1. Open [Vercel Dashboard](https://vercel.com).
-2. Import repository `https://github.com/sriram36/FinSight`.
-3. Configure Environment Variables:
-   - `NEXT_PUBLIC_API_BASE_URL`: `https://finsight-api-d84z.onrender.com`
-4. Click **Deploy**.
+### 3.1 Deployment Runbook
+1. Access the [Vercel Dashboard](https://vercel.com).
+2. Select **Add New...** → **Project** and import `https://github.com/sriram36/FinSight`.
+3. Set the build environment variables:
+
+| Key | Value | Notes |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://finsight-api-d84z.onrender.com` | Do not append a trailing slash. |
+
+4. Click **Deploy**. Vercel compiles and caches static assets globally across its edge network.
 
 ---
 
 ## 4. Local Deployment with Docker Compose
 
-Run the entire full-stack application locally with persistent data:
+For local development or dedicated VPS hosting:
 
 ```bash
 # Clone the repository
@@ -79,6 +85,30 @@ cd FinSight
 docker compose up --build -d
 ```
 
-- **Frontend:** `http://localhost:3000`
-- **Backend API & Swagger Docs:** `http://localhost:8000/docs`
-- **Data Persistence:** SQLite database stored in `./data/finsight.db`.
+- **Frontend Application:** `http://localhost:3000`
+- **Backend API & Docs:** `http://localhost:8000/docs`
+- **Data Persistence:** Volume mount mapped to `./data/finsight.db`.
+
+---
+
+## 5. Health Monitoring & Operational Verification
+
+### Health Check Endpoint
+Query the `/health` endpoint to verify service liveness:
+```bash
+curl -f https://finsight-api-d84z.onrender.com/health
+```
+
+Expected response:
+```json
+{
+  "status": "ok",
+  "app": "FinSight AI",
+  "version": "1.0.0",
+  "environment": "production"
+}
+```
+
+### Diagnostic Logging
+- **Render Service Logs:** Monitored via the Render Dashboard under **Logs**. Shows database initialization, query timing, and Uvicorn access traces.
+- **Vercel Runtime Logs:** Monitored via the Vercel Project Dashboard under **Runtime Logs**. Captures client-side fetch errors and rendering metrics.
