@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import {
   ArrowDownLeft,
@@ -29,7 +29,13 @@ import {
   Layers,
   Cpu,
   PieChart,
-  Repeat
+  Repeat,
+  AlertTriangle,
+  TrendingUp,
+  FileText,
+  Lock,
+  LogOut,
+  User
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OverviewView } from '@/components/views/overview-view'
@@ -42,26 +48,51 @@ import { ResearchView } from '@/components/views/research-view'
 import { ChatView } from '@/components/views/chat-view'
 import { BudgetsView } from '@/components/views/budgets-view'
 import { RecurringView } from '@/components/views/recurring-view'
+import { AnomaliesView } from '@/components/views/anomalies-view'
+import { ForecastView } from '@/components/views/forecast-view'
+import { ReviewView } from '@/components/views/review-view'
 import { ImportModal } from '@/components/import-modal'
 import { SettingsModal } from '@/components/settings-modal'
+import { AuthModal } from '@/components/auth-modal'
+import { AuthUser } from '@/lib/types'
 
-interface NavItem {
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  badge?: string
-  badgeVariant?: 'primary' | 'emerald' | 'amber'
+interface NavGroup {
+  title: string
+  items: {
+    label: string
+    icon: React.ComponentType<{ className?: string }>
+    badge?: string
+    badgeVariant?: 'primary' | 'emerald' | 'amber'
+  }[]
 }
 
-const navItems: NavItem[] = [
-  { label: 'Overview', icon: LayoutDashboard },
-  { label: 'Ask FinSight', icon: MessageSquareText, badge: 'gpt-5.6', badgeVariant: 'emerald' },
-  { label: 'Verified Insights', icon: Sparkles, badge: 'System C', badgeVariant: 'primary' },
-  { label: 'Budgets', icon: PieChart },
-  { label: 'Subscriptions', icon: Repeat },
-  { label: 'Transactions', icon: WalletCards },
-  { label: 'Goals', icon: Target },
-  { label: 'Simulate', icon: BarChart3 },
-  { label: 'Profile', icon: UserRound },
+const navGroups: NavGroup[] = [
+  {
+    title: 'Daily Finance',
+    items: [
+      { label: 'Overview', icon: LayoutDashboard },
+      { label: 'Transactions', icon: WalletCards },
+      { label: 'Budgets', icon: PieChart },
+      { label: 'Subscriptions', icon: Repeat },
+    ],
+  },
+  {
+    title: 'Financial Intelligence',
+    items: [
+      { label: 'Ask FinSight', icon: MessageSquareText, badge: 'gpt-5.6', badgeVariant: 'emerald' },
+      { label: 'Verified Insights', icon: Sparkles, badge: 'System C', badgeVariant: 'primary' },
+      { label: 'Unusual Spending', icon: AlertTriangle, badge: 'Active', badgeVariant: 'amber' },
+      { label: 'Cash Flow Forecast', icon: TrendingUp },
+    ],
+  },
+  {
+    title: 'Planning & Reviews',
+    items: [
+      { label: 'Goals', icon: Target },
+      { label: 'Monthly Review', icon: FileText },
+      { label: 'Simulate', icon: BarChart3 },
+    ],
+  },
 ]
 
 export function FinSightShell() {
@@ -70,7 +101,29 @@ export function FinSightShell() {
   const [activeView, setActiveView] = useState('Overview')
   const [showImport, setShowImport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const [importNotification, setImportNotification] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<AuthUser>({
+    id: 'default_user',
+    name: 'Jordan Davis',
+    email: 'jordan@finsight.local',
+    token: 'tok_demo_jordan_sandbox',
+    is_demo: true,
+  })
+
+  // Check saved session on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUser = localStorage.getItem('finsight_user')
+      if (savedUser) {
+        try {
+          setCurrentUser(JSON.parse(savedUser))
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
 
   const title = mode === 'research' ? 'Research Lab' : activeView
   const subtitle =
@@ -106,6 +159,12 @@ export function FinSightShell() {
       case 'Verified Insights':
       case 'Recommendations':
         return <RecommendationsView onOpenImport={() => setShowImport(true)} />
+      case 'Unusual Spending':
+        return <AnomaliesView />
+      case 'Cash Flow Forecast':
+        return <ForecastView />
+      case 'Monthly Review':
+        return <ReviewView />
       case 'Budgets':
         return <BudgetsView />
       case 'Subscriptions':
@@ -129,6 +188,13 @@ export function FinSightShell() {
     }
   }
 
+  const initials = currentUser.name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase()
+
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
       {/* Mobile nav backdrop */}
@@ -142,13 +208,13 @@ export function FinSightShell() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-card/95 px-4 py-5 backdrop-blur-md transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-card/95 px-5 py-6 backdrop-blur-md transition-transform duration-200 lg:translate-x-0 overflow-y-auto ${
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand Header */}
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-xl border border-border bg-card p-1 shadow-xs">
               <Image
                 src="/logo.svg"
@@ -163,7 +229,7 @@ export function FinSightShell() {
               <div className="flex items-center gap-1.5">
                 <p className="text-[15px] font-bold tracking-tight">FinSight AI</p>
                 <span className="rounded-md bg-primary/10 px-1.5 py-0.2 text-[10px] font-bold text-primary">
-                  v1.0
+                  v1.2
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground font-medium">Evidence-grounded finance</p>
@@ -181,9 +247,9 @@ export function FinSightShell() {
         </div>
 
         {/* Workspace mode selector */}
-        <div className="mt-7 px-2">
+        <div className="mt-6 px-1">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-            Workspace
+            Workspace Mode
           </p>
           <div className="flex rounded-xl bg-muted/60 p-1 border border-border/60">
             <button
@@ -197,7 +263,7 @@ export function FinSightShell() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Personal
+              Personal Finance
             </button>
             <button
               onClick={() => setMode('research')}
@@ -212,113 +278,126 @@ export function FinSightShell() {
           </div>
         </div>
 
-        {/* Navigation links */}
+        {/* Categorized Navigation */}
         <nav className="mt-6 flex-1 space-y-6" aria-label="Primary navigation">
-          <div>
-            <p className="mb-2.5 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-              {mode === 'personal' ? 'Financial Intelligence' : 'Benchmark Evaluation'}
-            </p>
-            <div className="flex flex-col gap-1">
-              {navItems.map((item) => {
-                const isActive = mode === 'personal' && activeView === item.label
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      setMode('personal')
-                      setActiveView(item.label)
-                      setMobileNavOpen(false)
-                    }}
-                    className={`group relative flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="size-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </div>
-
-                    {item.badge && !isActive && (
-                      <span
-                        className={`rounded-full px-2 py-0.2 text-[10px] font-bold ${
-                          item.badgeVariant === 'emerald'
-                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-primary/15 text-primary'
+          {mode === 'personal' ? (
+            navGroups.map((group) => (
+              <div key={group.title}>
+                <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                  {group.title}
+                </p>
+                <div className="flex flex-col gap-1">
+                  {group.items.map((item) => {
+                    const isActive = activeView === item.label
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => {
+                          setActiveView(item.label)
+                          setMobileNavOpen(false)
+                        }}
+                        className={`group relative flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                            : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                         }`}
                       >
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+                        <div className="flex items-center gap-3">
+                          <item.icon className="size-4 shrink-0" />
+                          <span>{item.label}</span>
+                        </div>
 
-          <div>
-            <p className="mb-2.5 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-              Research & Controls
-            </p>
-            <div className="flex flex-col gap-1">
+                        {item.badge && !isActive && (
+                          <span
+                            className={`rounded-full px-2 py-0.2 text-[10px] font-bold ${
+                              item.badgeVariant === 'emerald'
+                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                : item.badgeVariant === 'amber'
+                                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                : 'bg-primary/15 text-primary'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div>
+              <p className="mb-2.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                Benchmark Evaluation
+              </p>
               <button
                 onClick={() => {
                   setMode('research')
                   setMobileNavOpen(false)
                 }}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  mode === 'research'
-                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                }`}
+                className="flex w-full items-center gap-3 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-xs"
               >
                 <FlaskConical className="size-4 shrink-0" />
-                <span>Research Lab</span>
+                <span>PersonaLedger Benchmark</span>
               </button>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              Controls & Settings
+            </p>
+            <div className="flex flex-col gap-1">
               <button
                 onClick={() => setShowSettings(true)}
                 className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted/70 hover:text-foreground"
               >
                 <Settings2 className="size-4 shrink-0" />
-                <span>Settings & Sandbox</span>
+                <span>Sandbox & Database</span>
               </button>
             </div>
           </div>
         </nav>
 
-        {/* Privacy badge */}
-        <div className="rounded-xl border border-border/80 bg-muted/40 p-3.5">
-          <div className="mb-1.5 flex items-center gap-2">
+        {/* Security & Isolation Pill */}
+        <div className="mt-4 rounded-xl border border-border/80 bg-muted/40 p-3.5">
+          <div className="mb-1 flex items-center gap-2">
             <ShieldCheck className="size-4 text-emerald-500" />
-            <span className="text-xs font-bold tracking-tight">Zero-Leakage Persistence</span>
+            <span className="text-xs font-bold tracking-tight">Isolated Ledger Storage</span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Strict local SQLite / PostgreSQL persistence. Deterministic Python math stops LLM hallucinations.
+            Strict local SQLite / PostgreSQL persistence. Deterministic Python math stops LLM mathematical drift.
           </p>
         </div>
 
-        {/* User profile avatar */}
-        <div className="mt-4 flex items-center gap-3 border-t border-border px-2 pt-4">
-          <div className="relative">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/20 text-xs font-bold text-primary">
-              JD
+        {/* User profile avatar / Account switcher */}
+        <div
+          onClick={() => setShowAuthModal(true)}
+          className="mt-4 flex items-center justify-between border-t border-border px-1 pt-4 cursor-pointer hover:opacity-85 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/20 text-xs font-bold text-primary">
+                {initials}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card bg-emerald-500" />
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card bg-emerald-500" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold">{currentUser.name}</p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                {currentUser.is_demo ? 'Demo Sandbox' : 'Authenticated User'}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold">Jordan Davis</p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              {mode === 'research' ? 'Research Workspace' : 'Personal Workspace'}
-            </p>
-          </div>
+          <ChevronDown className="size-4 text-muted-foreground" />
         </div>
       </aside>
 
       {/* Main content area */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-72">
         {/* Top Header */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/85 px-4 backdrop-blur-md sm:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/85 px-6 backdrop-blur-md sm:px-10">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -330,7 +409,7 @@ export function FinSightShell() {
               <Menu className="size-5" />
             </Button>
             <div>
-              <p className="text-sm font-bold tracking-tight">Good day, Jordan</p>
+              <p className="text-sm font-bold tracking-tight">Welcome, {currentUser.name.split(' ')[0]}</p>
               <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
                 <span className="inline-flex items-center gap-1">
                   <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -342,34 +421,43 @@ export function FinSightShell() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowImport(true)}
-              className="gap-1.5 rounded-xl text-xs font-semibold"
+              className="gap-1.5 rounded-xl text-xs font-semibold shadow-2xs"
             >
               <Upload className="size-3.5 text-primary" />
               Import CSV
             </Button>
-            <div className="ml-1 flex size-8 items-center justify-center rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-xs">
-              JD
-            </div>
+
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="flex items-center gap-2 rounded-xl border border-border/80 bg-card px-2.5 py-1 text-xs font-semibold hover:border-border transition shadow-2xs"
+            >
+              <div className="flex size-6 items-center justify-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground">
+                {initials}
+              </div>
+              <span className="hidden sm:inline text-xs font-medium text-muted-foreground">
+                {currentUser.is_demo ? 'Demo Mode' : 'Account'}
+              </span>
+            </button>
           </div>
         </header>
 
-        {/* Page Container */}
-        <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-8 sm:py-8">
+        {/* Page Container with Generous Breathing Room */}
+        <main className="mx-auto max-w-7xl px-6 py-8 sm:px-10 sm:py-10 space-y-8">
           {importNotification && (
-            <div className="mb-6 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 animate-in fade-in">
+            <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3.5 text-sm text-emerald-800 dark:text-emerald-200 animate-in fade-in">
               <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
               {importNotification}
             </div>
           )}
 
-          <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-2xs">
+              <div className="mb-2.5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-2xs">
                 <span
                   className={`size-1.5 rounded-full ${
                     mode === 'research' ? 'bg-amber-500' : 'bg-emerald-500'
@@ -378,13 +466,13 @@ export function FinSightShell() {
                 {mode === 'research' ? 'Synthetic Research Mode' : 'Personal Finance Mode'}
               </div>
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed max-w-3xl">{subtitle}</p>
             </div>
 
             {mode === 'personal' && (
               <Button
                 onClick={() => setShowImport(true)}
-                className="w-full gap-2 sm:w-auto rounded-xl font-semibold shadow-xs"
+                className="w-full gap-2 sm:w-auto rounded-xl font-semibold shadow-xs shrink-0"
               >
                 <Upload className="size-4" />
                 Import Transactions
@@ -393,10 +481,10 @@ export function FinSightShell() {
           </div>
 
           {/* Active View Container */}
-          {renderActiveView()}
+          <div className="pt-2">{renderActiveView()}</div>
 
           {/* Educational Disclaimer */}
-          <p className="mt-10 text-center text-[11px] leading-relaxed text-muted-foreground border-t border-border/40 pt-6">
+          <p className="text-center text-[11px] leading-relaxed text-muted-foreground border-t border-border/40 pt-8 mt-12">
             FinSight AI provides evidence-grounded financial intelligence and mathematical analysis, not regulated financial advisory. All recommendations and metrics reconcile directly with your imported ledger receipts.
           </p>
         </main>
@@ -419,6 +507,17 @@ export function FinSightShell() {
           onClose={() => setShowSettings(false)}
           onDataReset={() => {
             setActiveView('Overview')
+          }}
+        />
+      )}
+
+      {/* Authentication Modal */}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={(user) => {
+            setCurrentUser(user)
+            setShowAuthModal(false)
           }}
         />
       )}

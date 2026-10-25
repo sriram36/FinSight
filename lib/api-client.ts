@@ -14,12 +14,24 @@ const isProduction = typeof window !== 'undefined' && window.location.hostname !
 const rawBase = process.env.NEXT_PUBLIC_API_BASE_URL || (isProduction ? 'https://finsight-api-d84z.onrender.com' : 'http://localhost:8000')
 const API_BASE = rawBase.replace(/\/+$/, '')
 
+function getAuthHeader(): Record<string, string> {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('finsight_token')
+    if (token) {
+      return { Authorization: `Bearer ${token}` }
+    }
+  }
+  return {}
+}
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`
+  const authHeaders = getAuthHeader()
   const res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...options?.headers,
     },
   })
@@ -289,5 +301,62 @@ export const api = {
 
   getUpcomingSchedule: (userId: string = 'default_user', horizonDays: number = 30): Promise<any> =>
     request<any>(`/recurring/upcoming?user_id=${userId}&horizon_days=${horizonDays}`),
+
+  // Unusual Spending & Anomalies
+  getAnomalies: (userId: string = 'default_user', status?: string): Promise<any[]> => {
+    const q = status ? `?user_id=${userId}&status=${status}` : `?user_id=${userId}`
+    return request<any[]>(`/anomalies${q}`)
+  },
+
+  detectAnomalies: (userId: string = 'default_user'): Promise<any[]> =>
+    request<any[]>(`/anomalies/detect?user_id=${userId}`, {
+      method: 'POST',
+    }),
+
+  getAnomaliesSummary: (userId: string = 'default_user'): Promise<any> =>
+    request<any>(`/anomalies/summary?user_id=${userId}`),
+
+  reviewAnomaly: (anomalyId: string, status: 'new' | 'reviewed' | 'confirmed_unusual' | 'dismissed', notes?: string, userId: string = 'default_user') =>
+    request<any>(`/anomalies/${anomalyId}/review?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ status, notes }),
+    }),
+
+  // Cash Flow Forecast
+  getForecast: (horizonDays: number = 30, startingBalance?: number, userId: string = 'default_user'): Promise<any> => {
+    let q = `?horizon_days=${horizonDays}&user_id=${userId}`
+    if (startingBalance !== undefined && startingBalance !== null) {
+      q += `&starting_balance=${startingBalance}`
+    }
+    return request<any>(`/forecast${q}`)
+  },
+
+  // Monthly Financial Review
+  getMonthlyReview: (month?: string, userId: string = 'default_user'): Promise<any> => {
+    const q = month ? `?month=${encodeURIComponent(month)}&user_id=${userId}` : `?user_id=${userId}`
+    return request<any>(`/review/monthly${q}`)
+  },
+
+  // Authentication
+  registerUser: (data: { name: string; email: string; password: string }): Promise<any> =>
+    request<any>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  loginUser: (data: { email: string; password: string }): Promise<any> =>
+    request<any>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getCurrentUser: (): Promise<any> =>
+    request<any>('/auth/me'),
+
+  logoutUser: (): Promise<any> =>
+    request<any>('/auth/logout', {
+      method: 'POST',
+    }),
 }
+
 

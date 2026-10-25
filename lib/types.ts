@@ -213,3 +213,92 @@ export interface UpcomingSchedule {
   count: number
   items: RecurringItem[]
 }
+
+export interface AnomalyItem {
+  id: string
+  user_id: string
+  transaction_id: string
+  title: string
+  category: string
+  amount: number
+  baseline_amount: number
+  deviation_pct: number
+  alert_type: 'unusually_large' | 'duplicate_charge' | 'unfamiliar_merchant' | string
+  severity: 'high' | 'medium' | 'low'
+  explanation: string
+  status: 'new' | 'reviewed' | 'confirmed_unusual' | 'dismissed'
+  user_decision?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AnomaliesSummary {
+  total_alerts: number
+  new_count: number
+  reviewed_count: number
+  total_amount_flagged: number
+  high_severity_count: number
+}
+
+export interface ForecastEvent {
+  date: string
+  type: string
+  name: string
+  category: string
+  amount: number
+  is_confirmed: boolean
+}
+
+export interface ForecastResponse {
+  horizon_days: number
+  start_date: string
+  end_date: string
+  starting_balance?: number | null
+  daily_burn_rate: number
+  projected_income: number
+  upcoming_obligations_total: number
+  projected_variable_spend: number
+  projected_total_outflow: number
+  projected_net_cash_flow: number
+  projected_closing_balance?: number | null
+  events: ForecastEvent[]
+  assumptions: string[]
+  confidence: number
+  status: string
+}
+
+export interface CategoryComparison {
+  category: string
+  current_spend: number
+  previous_spend: number
+  diff_amount: number
+  pct_change: number
+}
+
+export interface MonthlyReviewResponse {
+  month: string
+  previous_month: string
+  total_income: number
+  total_spending: number
+  net_cash_flow: number
+  savings_rate_pct: number
+  previous_income: number
+  previous_spending: number
+  spending_diff: number
+  category_comparisons: CategoryComparison[]
+  budget_summary: any
+  monthly_recurring_total: number
+  anomalies_count: number
+  anomalies: AnomalyItem[]
+  narrative: string
+  transaction_count: number
+}
+
+export interface AuthUser {
+  id: string
+  name: string
+  email: string
+  token: string
+  created_at?: string
+  is_demo?: boolean
+}

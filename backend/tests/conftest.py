@@ -18,6 +18,8 @@ def db():
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT,
+        password_hash TEXT,
+        salt TEXT,
         created_at TEXT NOT NULL
     );
     CREATE TABLE transactions (
@@ -106,6 +108,24 @@ def db():
         confidence REAL NOT NULL DEFAULT 1.0,
         notes TEXT,
         created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE anomalies (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        transaction_id TEXT,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        baseline_amount REAL,
+        deviation_pct REAL,
+        alert_type TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'medium',
+        explanation TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'new',
+        user_decision TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE TABLE research_runs (

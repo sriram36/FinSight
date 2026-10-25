@@ -1,26 +1,22 @@
-import hashlib
-import hmac
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from pydantic import BaseModel, Field
 from backend.database import get_db
+from backend.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-SECRET_SALT = "finsight_sec_salt_2026_ledger_zero_drift"
-
-def hash_password(password: str) -> str:
-    return hmac.new(SECRET_SALT.encode(), password.encode(), hashlib.sha256).hexdigest()
-
-def verify_password(plain_pwd: str, hashed_pwd: str) -> bool:
-    return hmac.compare_digest(hash_password(plain_pwd), hashed_pwd)
 
 class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: str = Field(..., pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=6, max_length=128)
 
 class LoginRequest(BaseModel):
     email: str
@@ -31,40 +27,42 @@ class UserResponse(BaseModel):
     name: str
     email: str
     token: str
+    created_at: Optional[str] = None
 
 @router.post("/register", response_model=UserResponse)
 def register(payload: RegisterRequest, db=Depends(get_db)):
     cursor = db.cursor()
     # Check if email exists
-    cursor.execute("SELECT id FROM users WHERE email = ?", (payload.email,))
+    cursor.execute("SELECT id FROM users WHERE email = ?", (payload.email.lower().strip(),))
     if cursor.fetchone():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email already exists."
+            detail="An account with this email address already exists."
         )
 
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
-    pwd_hash = hash_password(payload.password)
+    pwd_hash, salt = hash_password(payload.password)
     now_iso = datetime.now(timezone.utc).isoformat()
 
     cursor.execute("""
-    INSERT INTO users (id, name, email, created_at)
-    VALUES (?, ?, ?, ?)
-    """, (user_id, payload.name, payload.email, now_iso))
+    INSERT INTO users (id, name, email, password_hash, salt, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, payload.name.strip(), payload.email.lower().strip(), pwd_hash, salt, now_iso))
     db.commit()
 
-    token = f"tok_{uuid.uuid4().hex}_{user_id}"
+    token = create_access_token(user_id=user_id, email=payload.email.lower().strip())
     return UserResponse(
         id=user_id,
-        name=payload.name,
-        email=payload.email,
-        token=token
+        name=payload.name.strip(),
+        email=payload.email.lower().strip(),
+        token=token,
+        created_at=now_iso
     )
 
 @router.post("/login", response_model=UserResponse)
 def login(payload: LoginRequest, db=Depends(get_db)):
     cursor = db.cursor()
-    cursor.execute("SELECT id, name, email FROM users WHERE email = ?", (payload.email,))
+    cursor.execute("SELECT id, name, email, password_hash, salt, created_at FROM users WHERE email = ?", (payload.email.lower().strip(),))
     user = cursor.fetchone()
 
     if not user:
@@ -74,51 +72,48 @@ def login(payload: LoginRequest, db=Depends(get_db)):
                 id="default_user",
                 name="Jordan Davis",
                 email="jordan@finsight.local",
-                token="tok_demo_jordan_sandbox"
+                token="tok_demo_jordan_sandbox",
+                created_at="2026-01-01T00:00:00Z"
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password."
         )
 
-    user_id = user["id"]
-    token = f"tok_{uuid.uuid4().hex}_{user_id}"
+    # If demo user has no password_hash, allow if password is demo password
+    stored_hash = user["password_hash"]
+    salt = user["salt"]
+    if stored_hash and salt:
+        if not verify_password(payload.password, stored_hash, salt):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password."
+            )
+    elif user["id"] != "default_user":
+        # Legacy non-demo account without password hash
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account requires password reset."
+        )
+
+    token = create_access_token(user_id=user["id"], email=user["email"])
     return UserResponse(
-        id=user_id,
+        id=user["id"],
         name=user["name"],
         email=user["email"],
-        token=token
+        token=token,
+        created_at=user["created_at"]
     )
 
-@router.get("/me")
+@router.get("/me", response_model=Dict[str, Any])
 def get_current_user_profile(
-    authorization: Optional[str] = Header(None),
-    x_user_id: Optional[str] = Header(None),
-    db=Depends(get_db)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    target_id = x_user_id or "default_user"
-    if authorization and authorization.startswith("Bearer tok_"):
-        parts = authorization.split("_")
-        if len(parts) >= 3:
-            target_id = f"usr_{parts[-1]}"
-
-    cursor = db.cursor()
-    cursor.execute("SELECT id, name, email, created_at FROM users WHERE id = ?", (target_id,))
-    user = cursor.fetchone()
-    if not user:
-        # Fallback to demo user
-        return {
-            "id": "default_user",
-            "name": "Jordan Davis",
-            "email": "jordan@finsight.local",
-            "role": "sandbox_demo_user",
-            "is_isolated": True
-        }
-
     return {
-        "id": user["id"],
-        "name": user["name"],
-        "email": user["email"],
-        "created_at": user["created_at"],
-        "is_isolated": True
+        "status": "authenticated",
+        "user": current_user
     }
+
+@router.post("/logout")
+def logout():
+    return {"status": "success", "message": "Logged out successfully."}

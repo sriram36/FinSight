@@ -7,7 +7,9 @@ CURRENCY_EVIDENCE_KEYS = {
     "recent_daily_pace", "baseline_daily_pace", "diff_pace", "reallocation_amount",
     "total_spent", "purchase_amount", "available_balance", "post_purchase_balance",
     "emergency_buffer", "emergency_fund_target", "total_income", "total_spending",
-    "net_savings", "target_amount", "current_amount", "remaining_amount", "latest_amount"
+    "net_savings", "target_amount", "current_amount", "remaining_amount", "latest_amount",
+    "total_budget", "remaining", "upcoming_total", "flagged_amount", "projected_spend",
+    "projected_income", "projected_outflow", "projected_net", "total_upcoming"
 }
 PERCENTAGE_EVIDENCE_KEYS = {
     "percentage_deviation", "target_reduction", "threshold", "delta_percentage", "profile_delta", "savings_rate_pct"

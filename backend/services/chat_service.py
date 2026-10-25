@@ -111,6 +111,16 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
     # Intent classification
     if any(w in msg_lower for w in ["afford", "can i buy", "purchase", "affordability"]):
         intent = "affordability_check"
+    elif any(w in msg_lower for w in ["which budget", "budget status", "budgets", "burn rate", "likely to exceed"]):
+        intent = "budget_status"
+    elif any(w in msg_lower for w in ["payments are due", "upcoming bill", "due in", "subscriptions", "recurring"]):
+        intent = "recurring_inquiry"
+    elif any(w in msg_lower for w in ["flagged", "unusual", "anomaly", "anomalies", "duplicate"]):
+        intent = "anomaly_inquiry"
+    elif any(w in msg_lower for w in ["forecast", "future balance", "outlook", "cash flow forecast"]):
+        intent = "forecast_inquiry"
+    elif any(w in msg_lower for w in ["summarize my month", "monthly review", "month review", "summarize month"]):
+        intent = "monthly_review_inquiry"
     elif any(w in msg_lower for w in ["how much", "what did i spend", "spent on", "total spent"]):
         intent = "category_spending"
     elif any(w in msg_lower for w in ["why did my savings", "savings drop", "savings change", "why is savings"]):
@@ -336,6 +346,151 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
             f"How much did I spend on {top_dev_cat or 'Dining'} recently?",
             "Show recommendations to reduce spending",
             "What are my biggest categories?"
+        ]
+
+    elif intent == "budget_status":
+        from backend.services.budget_service import get_monthly_budget_summary
+        cur_month = now.strftime("%Y-%m")
+        bs = get_monthly_budget_summary(user_id, cur_month, db)
+        tot_b = round(bs["total_budget_limit"], 2)
+        tot_s = round(bs["total_spent"], 2)
+        rem = round(bs["remaining_budget"], 2)
+        over_cnt = bs["overrun_count"]
+
+        over_cats = [c["category"] for c in bs["categories"] if c["status"] in ("exceeded", "projected_overrun")]
+        over_msg = f"Categories approaching or over limit: {', '.join(over_cats)}." if over_cats else "All categories are currently within healthy pace."
+
+        facts = {
+            "total_budget": tot_b,
+            "total_spent": tot_s,
+            "remaining": rem,
+            "overrun_count": over_cnt
+        }
+        evidence = {
+            "total_budget": tot_b,
+            "total_spent": tot_s,
+            "remaining": rem
+        }
+        deterministic_reply = (
+            f"For {cur_month}, your total monthly budget limit is ₹{tot_b:,.2f}, with ₹{tot_s:,.2f} spent so far, "
+            f"leaving ₹{rem:,.2f} remaining. {over_msg}"
+        )
+        suggested_followups = [
+            "What payments are due this month?",
+            "Can I afford a ₹3,000 purchase?",
+            "Forecast my cash flow for the next 30 days"
+        ]
+
+    elif intent == "recurring_inquiry":
+        from backend.services.recurring_service import get_upcoming_schedule
+        sch = get_upcoming_schedule(user_id, 30, db)
+        tot_up = round(sch.get("total_upcoming_amount", 0.0), 2)
+        up_items = sch.get("upcoming_items", [])
+        top_bills = [f"{i['merchant']} (₹{i['amount']:,.2f} on {i['due_date']})" for i in up_items[:3]]
+        bills_str = "; ".join(top_bills) if top_bills else "no confirmed upcoming bills"
+
+        facts = {
+            "total_upcoming": tot_up,
+            "bills_count": len(up_items)
+        }
+        evidence = {
+            "total_upcoming": tot_up
+        }
+        deterministic_reply = (
+            f"Over the next 30 days, you have {len(up_items)} upcoming commitment(s) totaling ₹{tot_up:,.2f}. "
+            f"Next scheduled payments include: {bills_str}."
+        )
+        suggested_followups = [
+            "Which budgets am I likely to exceed?",
+            "Can I afford a ₹5,000 purchase?",
+            "Any unusual spending detected?"
+        ]
+
+    elif intent == "anomaly_inquiry":
+        from backend.services.anomaly_service import get_user_anomalies, detect_anomalies_from_ledger
+        alerts = get_user_anomalies(user_id, db, status_filter="new")
+        if not alerts:
+            alerts = detect_anomalies_from_ledger(user_id, db)
+            alerts = [a for a in alerts if a["status"] == "new"]
+
+        tot_flag = round(sum(a["amount"] for a in alerts), 2)
+        top_alerts = [f"{a['title']} (₹{a['amount']:,.2f})" for a in alerts[:2]]
+        alert_str = "; ".join(top_alerts) if top_alerts else "No unusual charges flagged"
+
+        facts = {
+            "flagged_amount": tot_flag,
+            "alert_count": len(alerts)
+        }
+        evidence = {
+            "flagged_amount": tot_flag
+        }
+        deterministic_reply = (
+            f"You have {len(alerts)} active unusual spending alert(s) totaling ₹{tot_flag:,.2f}. "
+            f"Highlighted entries: {alert_str}. Review them in the Unusual Spending section."
+        )
+        suggested_followups = [
+            "Check my monthly savings rate",
+            "Show my top spending categories",
+            "What is my 30-day forecast?"
+        ]
+
+    elif intent == "forecast_inquiry":
+        from backend.services.forecast_service import calculate_cash_flow_forecast
+        fc = calculate_cash_flow_forecast(user_id, 30, None, db)
+        p_inc = round(fc.get("projected_income", 0.0), 2)
+        p_out = round(fc.get("projected_total_outflow", 0.0), 2)
+        p_net = round(fc.get("projected_net_cash_flow", 0.0), 2)
+
+        facts = {
+            "projected_income": p_inc,
+            "projected_outflow": p_out,
+            "projected_net": p_net
+        }
+        evidence = {
+            "projected_income": p_inc,
+            "projected_outflow": p_out,
+            "projected_net": p_net
+        }
+        deterministic_reply = (
+            f"Over the next 30 days, your projected income is ₹{p_inc:,.2f} and expected total outflow is ₹{p_out:,.2f}, "
+            f"yielding a projected net cash-flow delta of ₹{p_net:,.2f} based on observed ledger burn rate and upcoming obligations."
+        )
+        suggested_followups = [
+            "Which budgets am I likely to exceed?",
+            "What payments are due in the next 30 days?",
+            "Can I afford a ₹15,000 purchase?"
+        ]
+
+    elif intent == "monthly_review_inquiry":
+        from backend.services.review_service import generate_monthly_review
+        cur_m = now.strftime("%Y-%m")
+        rev = generate_monthly_review(user_id, cur_m, db)
+        t_inc = round(rev["total_income"], 2)
+        t_sp = round(rev["total_spending"], 2)
+        t_net = round(rev["net_cash_flow"], 2)
+        s_rate = rev["savings_rate_pct"]
+
+        facts = {
+            "total_income": t_inc,
+            "total_spending": t_sp,
+            "net_savings": t_net,
+            "savings_rate_pct": s_rate
+        }
+        evidence = {
+            "total_income": t_inc,
+            "total_spending": t_sp,
+            "net_savings": t_net,
+            "savings_rate_pct": s_rate
+        }
+        deterministic_reply = (
+            f"In {cur_m}, your ledger records ₹{t_inc:,.2f} in income and ₹{t_sp:,.2f} in spending, "
+            f"yielding net cash flow of ₹{t_net:,.2f} ({s_rate}% savings rate). "
+            f"Check the Monthly Review tab for category comparisons and budget variances."
+        )
+        suggested_followups = [
+            "What are my highest expenses?",
+            "Which budgets did I exceed?",
+            "Forecast my cash flow for next month"
         ]
 
     else:  # General savings / default analysis

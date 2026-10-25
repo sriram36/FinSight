@@ -158,3 +158,15 @@ def get_budget_summary(user_id: str, month: Optional[str], db) -> Dict[str, Any]
         "exceeded_count": exceeded_count,
         "items": budgets
     }
+
+def get_monthly_budget_summary(user_id: str, month: Optional[str], db) -> Dict[str, Any]:
+    summary = get_budget_summary(user_id, month, db)
+    return {
+        "user_id": user_id,
+        "month": summary["month"],
+        "total_budget_limit": summary["total_budgeted"],
+        "total_spent": summary["total_spent"],
+        "remaining_budget": summary["total_remaining"],
+        "overrun_count": summary["exceeded_count"],
+        "categories": summary["items"]
+    }
