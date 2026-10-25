@@ -34,41 +34,49 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
   const [error, setError] = useState<string | null>(null)
   const [cashflowPeriod, setCashflowPeriod] = useState<'6m' | '12m'>('6m')
   const [cashflowData, setCashflowData] = useState<Array<{ month_key: string; month: string; income: number; expense: number; transaction_count: number }>>([])
+  const [seeding, setSeeding] = useState(false)
+
+  const fetchDashboard = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [profileRes, txRes, recRes, goalsRes, cashflowRes] = await Promise.allSettled([
+        api.getProfile(),
+        api.getTransactions({ limit: 10 }),
+        api.getRecommendations(),
+        api.getGoals(),
+        api.getCashflow(cashflowPeriod),
+      ])
+
+      if (profileRes.status === 'fulfilled') setProfile(profileRes.value)
+      if (txRes.status === 'fulfilled') setTransactions(txRes.value.items)
+      if (recRes.status === 'fulfilled') setRecommendations(recRes.value)
+      if (goalsRes.status === 'fulfilled') setGoals(goalsRes.value)
+      if (cashflowRes.status === 'fulfilled' && cashflowRes.value?.months) {
+        setCashflowData(cashflowRes.value.months)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch overview data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSeedDemo = async () => {
+    setSeeding(true)
+    try {
+      await api.seedDemoData('default_user')
+      await fetchDashboard()
+    } catch (err: any) {
+      console.error('Failed to seed demo data', err)
+      setError(err.message || 'Failed to seed demo ledger')
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   useEffect(() => {
-    let mounted = true
-    async function fetchDashboard() {
-      setLoading(true)
-      setError(null)
-      try {
-        const [profileRes, txRes, recRes, goalsRes, cashflowRes] = await Promise.allSettled([
-          api.getProfile(),
-          api.getTransactions({ limit: 10 }),
-          api.getRecommendations(),
-          api.getGoals(),
-          api.getCashflow(cashflowPeriod),
-        ])
-
-        if (!mounted) return
-
-        if (profileRes.status === 'fulfilled') setProfile(profileRes.value)
-        if (txRes.status === 'fulfilled') setTransactions(txRes.value.items)
-        if (recRes.status === 'fulfilled') setRecommendations(recRes.value)
-        if (goalsRes.status === 'fulfilled') setGoals(goalsRes.value)
-        if (cashflowRes.status === 'fulfilled' && cashflowRes.value?.months) {
-          setCashflowData(cashflowRes.value.months)
-        }
-      } catch (err: any) {
-        if (mounted) setError(err.message || 'Failed to fetch overview data')
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    }
-
     fetchDashboard()
-    return () => {
-      mounted = false
-    }
   }, [])
 
   // Refetch cashflow when period changes
@@ -375,10 +383,16 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
         {transactions.length === 0 ? (
           <div className="p-10 text-center">
             <WalletCards className="mx-auto size-8 text-muted-foreground/30 mb-2" />
-            <p className="text-xs text-muted-foreground">No transactions available yet.</p>
-            <Button onClick={onOpenImport} variant="outline" className="mt-3 text-xs gap-1.5">
-              <Plus className="size-3.5" /> Import CSV
-            </Button>
+            <p className="text-xs text-muted-foreground">No transactions available yet in your ledger.</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Button onClick={onOpenImport} variant="outline" className="text-xs gap-1.5">
+                <Plus className="size-3.5" /> Import CSV
+              </Button>
+              <Button onClick={handleSeedDemo} disabled={seeding} className="text-xs gap-1.5">
+                {seeding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                Load Demo Ledger (Jordan Davis)
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="divide-y divide-border">

@@ -130,6 +130,11 @@ export const api = {
       method: 'DELETE',
     }),
 
+  seedDemoData: (userId: string = 'default_user') =>
+    request<{ message: string; seeded: boolean }>(`/transactions/seed?user_id=${userId}`, {
+      method: 'POST',
+    }),
+
   // Profile
   getProfile: (params?: {
     user_id?: string

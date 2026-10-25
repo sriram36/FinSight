@@ -261,8 +261,8 @@ def init_db(db_target: Optional[str] = None, auto_seed: bool = True):
             from backend.seed import seed_demo_data
             seed_demo_data(conn)
         except Exception as e:
-            # Non-fatal if seed fails
-            pass
+            import logging
+            logging.getLogger("finsight").error(f"Error seeding initial demo data: {e}", exc_info=True)
 
     conn.close()
 

@@ -268,3 +268,13 @@ def clear_all_transactions(
     db.commit()
     return {"message": f"All transactions and history reset for {user_id}.", "deleted": True}
 
+@router.post("/seed")
+def seed_demo_transactions(
+    user_id: str = "default_user",
+    db=Depends(get_db)
+):
+    """Explicitly populates the demo ledger and initial goals if empty."""
+    from backend.seed import seed_demo_data
+    seed_demo_data(db)
+    return {"message": f"Demo ledger successfully seeded for {user_id}.", "seeded": True}
+
