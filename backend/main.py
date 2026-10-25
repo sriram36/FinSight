@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.database import init_db
-from backend.routers import health, imports, transactions, profile, goals, scenarios, recommendations, research, chat
+from backend.routers import health, imports, transactions, profile, goals, scenarios, recommendations, research, chat, budgets, recurring, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,8 +40,11 @@ async def global_exception_handler(request, exc):
     )
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(imports.router)
 app.include_router(transactions.router)
+app.include_router(budgets.router)
+app.include_router(recurring.router)
 app.include_router(profile.router)
 app.include_router(goals.router)
 app.include_router(scenarios.router)

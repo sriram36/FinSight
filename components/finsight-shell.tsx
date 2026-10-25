@@ -27,7 +27,9 @@ import {
   MessageSquareText,
   X,
   Layers,
-  Cpu
+  Cpu,
+  PieChart,
+  Repeat
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OverviewView } from '@/components/views/overview-view'
@@ -38,6 +40,8 @@ import { SimulateView } from '@/components/views/simulate-view'
 import { GoalsView } from '@/components/views/goals-view'
 import { ResearchView } from '@/components/views/research-view'
 import { ChatView } from '@/components/views/chat-view'
+import { BudgetsView } from '@/components/views/budgets-view'
+import { RecurringView } from '@/components/views/recurring-view'
 import { ImportModal } from '@/components/import-modal'
 import { SettingsModal } from '@/components/settings-modal'
 
@@ -52,6 +56,8 @@ const navItems: NavItem[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Ask FinSight', icon: MessageSquareText, badge: 'gpt-5.6', badgeVariant: 'emerald' },
   { label: 'Verified Insights', icon: Sparkles, badge: 'System C', badgeVariant: 'primary' },
+  { label: 'Budgets', icon: PieChart },
+  { label: 'Subscriptions', icon: Repeat },
   { label: 'Transactions', icon: WalletCards },
   { label: 'Goals', icon: Target },
   { label: 'Simulate', icon: BarChart3 },
@@ -100,6 +106,11 @@ export function FinSightShell() {
       case 'Verified Insights':
       case 'Recommendations':
         return <RecommendationsView onOpenImport={() => setShowImport(true)} />
+      case 'Budgets':
+        return <BudgetsView />
+      case 'Subscriptions':
+      case 'Recurring':
+        return <RecurringView />
       case 'Transactions':
         return <TransactionsView onOpenImport={() => setShowImport(true)} />
       case 'Profile':

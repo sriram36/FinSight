@@ -158,3 +158,58 @@ export interface CategoryPreference {
   reason?: string | null
   updated_at: string
 }
+
+export interface Budget {
+  id: string
+  user_id: string
+  category: string
+  monthly_limit: number
+  month: string
+  spent_amount: number
+  remaining_amount: number
+  percentage_used: number
+  projected_spend: number
+  transaction_count: number
+  status: 'healthy' | 'warning' | 'exceeded' | 'projected_overrun'
+  days_elapsed: number
+  total_days_in_month: number
+}
+
+export interface BudgetSummary {
+  user_id: string
+  month: string
+  total_budgeted: number
+  total_spent: number
+  total_remaining: number
+  total_projected: number
+  budget_count: number
+  healthy_count: number
+  warning_count: number
+  exceeded_count: number
+  items: Budget[]
+}
+
+export interface RecurringItem {
+  id: string
+  user_id: string
+  merchant: string
+  category: string
+  amount: number
+  frequency: string
+  next_due_date: string
+  last_seen_date: string
+  status: string
+  is_confirmed: boolean
+  confidence: number
+  notes?: string | null
+  occurrence_count?: number
+  days_remaining?: number
+  created_at: string
+}
+
+export interface UpcomingSchedule {
+  horizon_days: number
+  total_upcoming: number
+  count: number
+  items: RecurringItem[]
+}

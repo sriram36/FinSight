@@ -249,5 +249,45 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
+
+  // Smart Budgeting
+  getBudgets: (userId: string = 'default_user', month?: string): Promise<any[]> => {
+    const q = month ? `?user_id=${userId}&month=${encodeURIComponent(month)}` : `?user_id=${userId}`
+    return request<any[]>(`/budgets${q}`)
+  },
+
+  getBudgetSummary: (userId: string = 'default_user', month?: string): Promise<any> => {
+    const q = month ? `?user_id=${userId}&month=${encodeURIComponent(month)}` : `?user_id=${userId}`
+    return request<any>(`/budgets/summary${q}`)
+  },
+
+  createOrUpdateBudget: (data: { user_id?: string; category: string; monthly_limit: number; month?: string }) =>
+    request<any>('/budgets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteBudget: (budgetId: string, userId: string = 'default_user') =>
+    request<any>(`/budgets/${budgetId}?user_id=${userId}`, {
+      method: 'DELETE',
+    }),
+
+  // Recurring Payments & Subscriptions
+  getRecurringItems: (userId: string = 'default_user'): Promise<any[]> =>
+    request<any[]>(`/recurring?user_id=${userId}`),
+
+  detectRecurring: (userId: string = 'default_user'): Promise<any[]> =>
+    request<any[]>(`/recurring/detect?user_id=${userId}`, {
+      method: 'POST',
+    }),
+
+  confirmRecurring: (itemId: string, isConfirmed: boolean, userId: string = 'default_user') =>
+    request<any>(`/recurring/${itemId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, is_confirmed: isConfirmed }),
+    }),
+
+  getUpcomingSchedule: (userId: string = 'default_user', horizonDays: number = 30): Promise<any> =>
+    request<any>(`/recurring/upcoming?user_id=${userId}&horizon_days=${horizonDays}`),
 }
 

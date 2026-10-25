@@ -81,6 +81,33 @@ def db():
         created_at TEXT NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+    CREATE TABLE budgets (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        monthly_limit REAL NOT NULL,
+        month TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(user_id, category, month),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE recurring_items (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        merchant TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        frequency TEXT NOT NULL DEFAULT 'monthly',
+        next_due_date TEXT,
+        last_seen_date TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        is_confirmed INTEGER NOT NULL DEFAULT 0,
+        confidence REAL NOT NULL DEFAULT 1.0,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
     CREATE TABLE research_runs (
         id TEXT PRIMARY KEY,
         dataset_version TEXT NOT NULL,

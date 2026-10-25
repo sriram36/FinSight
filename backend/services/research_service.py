@@ -564,7 +564,7 @@ def run_perturbation_experiment(
     rec_b_text = f"Plan flexible purchases carefully around {target_category}. Your {target_category} spending has shown an upward shift (+{top_post['percentage_deviation']:.1f}%) recently."
     v_b = verify_recommendation_claims(rec_b_text, top_post, tolerance=0.01)
 
-    det_b_abl = True
+    det_b_abl = (top_post["category"] == target_category)
     rec_b_abl_text = f"You seemed to spend quite a bit on {target_category} lately. Easing back might help your savings."
     v_b_abl = verify_recommendation_claims(rec_b_abl_text, {}, tolerance=0.01)
 

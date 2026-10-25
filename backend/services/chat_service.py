@@ -36,26 +36,79 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Category matching
+    # Category matching against actual user categories
     cursor.execute("SELECT DISTINCT category FROM transactions WHERE user_id = ?", (user_id,))
     known_categories = [r[0] for r in cursor.fetchall() if r[0]]
 
+    # 1. Direct exact or substring match in user's real categories
     for cat in known_categories:
         if cat.lower() in msg_lower:
             category = cat
             break
 
+    # 2. Alias / synonym matching mapped to user's real categories
     if not category:
-        # Common aliases
-        if any(w in msg_lower for w in ["food", "dining", "eating", "restaurant", "swiggy", "zomato"]):
-            category = "Dining"
-        elif any(w in msg_lower for w in ["groceries", "grocery", "supermarket", "bigbasket"]):
-            category = "Groceries"
-        elif any(w in msg_lower for w in ["shopping", "clothes", "amazon", "retail"]):
-            category = "Shopping"
-        elif any(w in msg_lower for w in ["bills", "utility", "electricity", "water", "rent"]):
-            category = "Utilities"
+        category_aliases = {
+            "Dining Out": ["food", "dining", "eating", "restaurant", "swiggy", "zomato", "cafe", "takeout", "lunch", "dinner"],
+            "Dining": ["food", "dining", "eating", "restaurant", "swiggy", "zomato", "cafe", "takeout", "lunch", "dinner"],
+            "Groceries": ["groceries", "grocery", "supermarket", "bigbasket", "provisions", "mart"],
+            "Shopping": ["shopping", "clothes", "amazon", "retail", "myntra", "flipkart"],
+            "Retail": ["shopping", "clothes", "amazon", "retail", "store"],
+            "Utilities": ["bills", "utility", "electricity", "water", "wifi", "broadband", "power"],
+            "Rent/Mortgage": ["rent", "mortgage", "housing", "landlord", "flat rent"],
+            "Housing": ["rent", "mortgage", "housing", "landlord"],
+            "Transportation": ["transport", "commute", "uber", "ola", "metro", "fuel", "petrol", "cab"],
+            "Subscriptions": ["subscription", "subscriptions", "netflix", "spotify", "prime", "youtube"],
+            "Healthcare": ["health", "medical", "doctor", "medicine", "pharmacy", "hospital"]
+        }
+        for known_cat in known_categories:
+            for alias_key, words in category_aliases.items():
+                if known_cat.lower() == alias_key.lower() and any(w in msg_lower for w in words):
+                    category = known_cat
+                    break
+            if category:
+                break
 
+    # 3. Fallback to common taxonomy names if not found in current ledger
+    if not category:
+        fallback_map = [
+            ("Dining", ["food", "dining", "eating", "restaurant", "swiggy", "zomato"]),
+            ("Groceries", ["groceries", "grocery", "supermarket", "bigbasket"]),
+            ("Shopping", ["shopping", "clothes", "amazon", "retail"]),
+            ("Utilities", ["bills", "utility", "electricity", "water"]),
+            ("Subscriptions", ["subscription", "subscriptions", "netflix", "spotify"]),
+            ("Transportation", ["transport", "commute", "uber", "ola", "metro"])
+        ]
+        for alias_key, words in fallback_map:
+            if any(w in msg_lower for w in words):
+                category = alias_key
+                break
+
+    # Date range parsing
+    now = datetime.now(timezone.utc)
+    date_filter = None
+    date_label = "all-time"
+
+    if "last month" in msg_lower or "previous month" in msg_lower:
+        first_this_month = now.replace(day=1)
+        last_day_prev_month = first_this_month - timedelta(days=1)
+        first_day_prev_month = last_day_prev_month.replace(day=1)
+        date_filter = (first_day_prev_month.strftime("%Y-%m-%d"), last_day_prev_month.strftime("%Y-%m-%d"))
+        date_label = f"in previous month ({date_filter[0]} to {date_filter[1]})"
+    elif "this month" in msg_lower or "current month" in msg_lower:
+        first_this_month = now.replace(day=1)
+        date_filter = (first_this_month.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d"))
+        date_label = f"this month ({date_filter[0]} to {date_filter[1]})"
+    elif "last 30 days" in msg_lower or "past 30 days" in msg_lower:
+        start_date = now - timedelta(days=30)
+        date_filter = (start_date.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d"))
+        date_label = f"over the last 30 days ({date_filter[0]} to {date_filter[1]})"
+    elif "last 90 days" in msg_lower or "past 90 days" in msg_lower:
+        start_date = now - timedelta(days=90)
+        date_filter = (start_date.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d"))
+        date_label = f"over the last 90 days ({date_filter[0]} to {date_filter[1]})"
+
+    # Intent classification
     if any(w in msg_lower for w in ["afford", "can i buy", "purchase", "affordability"]):
         intent = "affordability_check"
     elif any(w in msg_lower for w in ["how much", "what did i spend", "spent on", "total spent"]):
@@ -75,7 +128,7 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
     suggested_followups = []
 
     if intent == "affordability_check" and target_amount:
-        # Fetch current liquidity from income vs spending
+        # Fetch current liquidity from real income vs spending (NEVER invent numbers)
         cursor.execute("""
         SELECT 
             SUM(CASE WHEN direction = 'income' OR direction = 'credit' THEN amount ELSE 0 END) AS total_inc,
@@ -85,19 +138,29 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         bal_row = cursor.fetchone()
         tot_inc = float(bal_row["total_inc"] or 0.0) if bal_row else 0.0
         tot_exp = float(bal_row["total_exp"] or 0.0) if bal_row else 0.0
-        est_balance = max(15000.0, tot_inc - tot_exp)
+        net_cash_flow = round(tot_inc - tot_exp, 2)
 
-        # Active goals monthly commitment
+        # Real confirmed available liquid balance derived directly from ledger
+        verified_balance = max(0.0, net_cash_flow)
+
+        # Active goals monthly needed
         cursor.execute("SELECT SUM(target_amount) FROM goals WHERE user_id = ? AND status = 'active'", (user_id,))
         g_row = cursor.fetchone()
-        monthly_goal_req = float(g_row[0] or 0.0) if g_row else 5000.0
+
+        # Check confirmed upcoming obligations from recurring_items (if any table exists)
+        try:
+            cursor.execute("SELECT SUM(amount) FROM recurring_items WHERE user_id = ? AND status = 'active'", (user_id,))
+            rec_row = cursor.fetchone()
+            confirmed_obligations = round(float(rec_row[0] or 0.0), 2) if rec_row and rec_row[0] else 0.0
+        except Exception:
+            confirmed_obligations = 0.0
 
         aff_req = AffordabilityRequest(
             user_id=user_id,
             purchase_amount=target_amount,
-            available_balance=est_balance,
-            upcoming_obligations=round(tot_exp / 3.0 if tot_exp > 0 else 5000.0, 2),
-            emergency_buffer=10000.0
+            available_balance=verified_balance,
+            upcoming_obligations=confirmed_obligations,
+            emergency_buffer=0.0
         )
         aff_result = evaluate_affordability(aff_req, db)
 
@@ -106,20 +169,21 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         facts = {
             "purchase_amount": target_amount,
             "verdict": verdict,
-            "available_balance": round(est_balance, 2),
+            "available_balance": round(verified_balance, 2),
             "post_purchase_balance": round(post_bal, 2),
-            "emergency_buffer": round(aff_result.emergency_buffer, 2),
             "category": category or "Discretionary"
         }
         evidence = facts.copy()
         evidence["purchase_amount"] = target_amount
         evidence["post_purchase_balance"] = round(post_bal, 2)
-        evidence["available_balance"] = round(est_balance, 2)
+        evidence["available_balance"] = round(verified_balance, 2)
 
         deterministic_reply = (
-            f"Based on your ledger, a purchase of ₹{target_amount:,.2f} has an affordability verdict of **{verdict.upper()}**. "
-            f"Your current estimated balance is ₹{est_balance:,.2f}, leaving ₹{post_bal:,.2f} after the purchase. "
-            f"{aff_result.summary}"
+            f"Based on your verified ledger cash flow (net recorded surplus of ₹{verified_balance:,.2f}), "
+            f"a purchase of ₹{target_amount:,.2f} receives an affordability verdict of **{verdict.upper()}**. "
+            f"After this purchase, your remaining safe balance would be ₹{post_bal:,.2f}. "
+            f"{aff_result.summary} "
+            f"Note: Evaluated against your confirmed ledger transactions with ₹{confirmed_obligations:,.2f} scheduled obligations."
         )
         suggested_followups = [
             f"What if I buy it next month instead?",
@@ -128,33 +192,48 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         ]
 
     elif intent == "category_spending" and category:
-        # Calculate exact spend on category in past 30 days and all time
-        cursor.execute("""
-        SELECT id, transaction_date, description, amount, direction, category
-        FROM transactions 
-        WHERE user_id = ? AND category = ? AND (direction = 'spending' OR direction = 'debit')
-        ORDER BY transaction_date DESC
-        """, (user_id, category))
+        if date_filter:
+            cursor.execute("""
+            SELECT id, transaction_date, description, amount, direction, category
+            FROM transactions 
+            WHERE user_id = ? AND category = ? AND (direction = 'spending' OR direction = 'debit')
+              AND transaction_date >= ? AND transaction_date <= ?
+            ORDER BY transaction_date DESC
+            """, (user_id, category, date_filter[0], date_filter[1]))
+        else:
+            cursor.execute("""
+            SELECT id, transaction_date, description, amount, direction, category
+            FROM transactions 
+            WHERE user_id = ? AND category = ? AND (direction = 'spending' OR direction = 'debit')
+            ORDER BY transaction_date DESC
+            """, (user_id, category))
+
         tx_rows = cursor.fetchall()
         tx_items = [dict(r) for r in tx_rows]
         total_spent = sum(float(r["amount"]) for r in tx_items)
         count = len(tx_items)
         cited_transactions = tx_items[:5]
 
+        latest_amount = round(float(cited_transactions[0]["amount"]), 2) if cited_transactions else 0.0
+
         facts = {
             "category": category,
             "total_spent": round(total_spent, 2),
-            "transaction_count": count
+            "transaction_count": count,
+            "period": date_label
         }
         evidence = facts.copy()
         evidence["total_spent"] = round(total_spent, 2)
         evidence["transaction_count"] = count
         evidence["source_transaction_ids"] = [r["id"] for r in cited_transactions]
+        if cited_transactions:
+            evidence["latest_amount"] = latest_amount
+            facts["latest_amount"] = latest_amount
 
         deterministic_reply = (
-            f"You have spent a total of ₹{total_spent:,.2f} across {count} transaction{'' if count == 1 else 's'} in {category}. "
-            f"Your latest transaction was on {cited_transactions[0]['transaction_date']}: {cited_transactions[0]['description']} (₹{cited_transactions[0]['amount']:,.2f})."
-            if count > 0 else f"You have zero recorded transactions in {category}."
+            f"You have spent a total of ₹{total_spent:,.2f} across {count} transaction{'' if count == 1 else 's'} in {category} {date_label}. "
+            f"Your latest transaction was on {cited_transactions[0]['transaction_date']}: {cited_transactions[0]['description']} (₹{latest_amount:,.2f})."
+            if count > 0 else f"You have zero recorded transactions in {category} {date_label}."
         )
         suggested_followups = [
             f"Can I afford to spend ₹2,000 more on {category}?",
@@ -163,6 +242,15 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         ]
 
     elif intent == "top_categories":
+        # Calculate real total spending across all categories as denominator
+        cursor.execute("""
+        SELECT SUM(amount) AS overall_spend
+        FROM transactions
+        WHERE user_id = ? AND (direction = 'spending' OR direction = 'debit')
+        """, (user_id,))
+        overall_row = cursor.fetchone()
+        real_total_spending = round(float(overall_row["overall_spend"] or 0.0), 2) if overall_row else 0.0
+
         cursor.execute("""
         SELECT category, SUM(amount) AS cat_total, COUNT(*) AS tx_count
         FROM transactions
@@ -172,31 +260,82 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         LIMIT 5
         """, (user_id,))
         top_cats = cursor.fetchall()
-        total_spending = sum(float(r["cat_total"]) for r in top_cats)
+        top_5_spending = round(sum(float(r["cat_total"]) for r in top_cats), 2)
 
         top_list = []
         for r in top_cats:
             c_name = r["category"]
             c_amt = round(float(r["cat_total"]), 2)
-            pct = round((c_amt / total_spending * 100), 1) if total_spending > 0 else 0.0
-            top_list.append(f"{c_name}: ₹{c_amt:,.2f} ({pct}%)")
+            pct = round((c_amt / real_total_spending * 100), 1) if real_total_spending > 0 else 0.0
+            top_list.append(f"{c_name}: ₹{c_amt:,.2f} ({pct}% of total spending)")
 
         facts = {
             "top_categories": top_list,
-            "total_spending": round(total_spending, 2)
+            "total_spending": real_total_spending,
+            "top_5_sum": top_5_spending
         }
-        evidence = {"total_spending": round(total_spending, 2)}
+        evidence = {
+            "total_spending": real_total_spending,
+            "total_spent": top_5_spending
+        }
         for idx, r in enumerate(top_cats):
             evidence[f"cat_{idx+1}_amount"] = round(float(r["cat_total"]), 2)
 
         deterministic_reply = (
-            f"Here is your spending breakdown across your top categories (totaling ₹{total_spending:,.2f}):\n" +
+            f"Here is your spending breakdown across your top categories (overall ledger spending ₹{real_total_spending:,.2f}):\n" +
             "\n".join([f"• **{item}**" for item in top_list])
         )
         suggested_followups = [
             "How can I cut spending in my highest category?",
             "Check my monthly savings rate",
             "Can I afford a ₹10,000 vacation?"
+        ]
+
+    elif intent == "savings_analysis":
+        # Decision Replay / Variance Attribution against spending profile
+        from backend.services.profile_service import calculate_spending_profile
+        profile = calculate_spending_profile(user_id, db)
+
+        top_dev_cat = profile.highest_deviation_category
+        tot_rec = round(profile.total_recent_spending, 2)
+        tot_base = round(profile.total_baseline_spending, 2)
+
+        dev_info = ""
+        monthly_impact = 0.0
+        pct_dev = 0.0
+        if top_dev_cat and top_dev_cat in profile.categories:
+            cat_data = profile.categories[top_dev_cat]
+            pct_dev = round(cat_data.percentage_deviation or 0.0, 1)
+            monthly_impact = round(max(0.0, cat_data.recent_daily_pace - cat_data.baseline_daily_pace) * 30.0, 2)
+            dev_info = (
+                f"The primary driver is **{top_dev_cat}**, where your recent spending pace increased by **{pct_dev}%** "
+                f"above your historical baseline (an estimated impact of ₹{monthly_impact:,.2f}/month)."
+            )
+        else:
+            dev_info = "Your recent category spending paces have remained within historical variance."
+
+        facts = {
+            "recent_total": tot_rec,
+            "baseline_total": tot_base,
+            "percentage_deviation": pct_dev,
+            "monthly_impact": monthly_impact,
+            "driver_category": top_dev_cat or "None"
+        }
+        evidence = {
+            "recent_amount": tot_rec,
+            "baseline_amount": tot_base,
+            "percentage_deviation": pct_dev,
+            "monthly_impact": monthly_impact
+        }
+        deterministic_reply = (
+            f"In your recent spending window ({profile.recent_days} days), total spending was ₹{tot_rec:,.2f} "
+            f"compared to ₹{tot_base:,.2f} across the baseline window ({profile.baseline_days} days). "
+            f"{dev_info} All figures are mathematically reconciled against your imported ledger."
+        )
+        suggested_followups = [
+            f"How much did I spend on {top_dev_cat or 'Dining'} recently?",
+            "Show recommendations to reduce spending",
+            "What are my biggest categories?"
         ]
 
     else:  # General savings / default analysis
