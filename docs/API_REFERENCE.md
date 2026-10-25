@@ -107,9 +107,12 @@ Commits a verified set of previewed transactions into persistent storage. Dedupl
 ```json
 {
   "import_id": "imp_7a2b9c1d",
-  "accepted_count": 1,
-  "rejected_count": 0,
-  "duplicate_count": 0
+  "total_rows": 50,
+  "accepted_count": 48,
+  "rejected_count": 1,
+  "duplicate_count": 1,
+  "file_name": "statement_q1.csv",
+  "created_at": "2026-02-15T12:00:00"
 }
 ```
 
@@ -120,7 +123,7 @@ Returns a reverse-chronological list of all statement imports executed by the us
 
 ---
 
-## 3. Transaction Management
+## 3. Transaction Management & Cashflow
 
 ### `GET /transactions`
 Queries user transactions with multi-dimensional filtering, text search, and pagination.
@@ -159,6 +162,39 @@ Queries user transactions with multi-dimensional filtering, text search, and pag
 }
 ```
 
+### `GET /transactions/cashflow`
+Computes monthly aggregated income and spending time-series derived from real transaction records across 6m or 12m intervals.
+
+- **Query Parameters:**
+  - `user_id`: string (default `"default_user"`)
+  - `period`: `"6m"` | `"12m"` (default `"6m"`)
+
+**Response (200 OK):**
+```json
+{
+  "months": [
+    {
+      "month": "2026-01",
+      "month_label": "Jan 2026",
+      "income": 85000.00,
+      "spending": 42100.00,
+      "net_cashflow": 42900.00
+    }
+  ],
+  "total_income": 170000.00,
+  "total_spending": 84250.00,
+  "avg_monthly_spending": 42125.00,
+  "avg_monthly_income": 85000.00,
+  "savings_rate_pct": 50.44
+}
+```
+
+### `GET /transactions/export`
+Streams a formatted CSV export of all transactions belonging to the user.
+
+- **Query Parameters:** `user_id` (string)
+- **Response:** `text/csv` attachment `transactions_export_<user_id>.csv`
+
 ### `POST /transactions`
 Manually records an individual transaction.
 
@@ -166,7 +202,12 @@ Manually records an individual transaction.
 Updates a transaction's category (marking `category_source = "manual_override"`), description, or amount.
 
 ### `DELETE /transactions/{id}`
-Permanently removes a transaction record.
+Permanently removes a single transaction record.
+
+### `DELETE /transactions`
+Clears all transactions, imports, and generated recommendations for the user session (sandbox demo reset).
+
+- **Query Parameters:** `user_id` (string)
 
 ---
 

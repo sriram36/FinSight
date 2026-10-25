@@ -53,9 +53,50 @@ def test_confirm_csv_import(db):
     ]
     res = confirm_csv_import("default_user", "test_file.csv", tx_list, db)
     assert res["accepted_count"] == 4
-    
     # Verify in DB
     cursor = db.cursor()
     cursor.execute("SELECT COUNT(*) FROM transactions WHERE user_id = 'default_user'")
     count = cursor.fetchone()[0]
     assert count == 4
+
+def test_in_file_duplicate_detection_and_accounting_identity(db):
+    duplicate_csv = """Date,Description,Amount,Category
+2026-05-24,Duplicate Coffee,150.00,Dining
+2026-05-24,Duplicate Coffee,150.00,Dining
+2026-05-25,Valid Snack,80.00,Dining
+not-a-date,Malformed Row,abc,Dining
+"""
+    preview = parse_csv_preview(duplicate_csv, "dup.csv", "default_user", db)
+    assert preview.total_rows == 4
+    assert preview.accepted_rows == 2  # Coffee (first occurrence) + Snack
+    assert preview.duplicate_rows == 1 # Coffee (second occurrence)
+    assert preview.rejected_rows == 1  # Malformed row
+    # Invariant: total_rows == accepted_rows + rejected_rows + duplicate_rows
+    assert preview.total_rows == preview.accepted_rows + preview.rejected_rows + preview.duplicate_rows
+
+    valid_txs = [
+        {
+            "user_id": "default_user",
+            "transaction_date": r.mapped_date,
+            "description": r.mapped_description,
+            "amount": r.mapped_amount,
+            "direction": r.mapped_direction,
+            "category": r.mapped_category
+        }
+        for r in preview.sample_preview if r.status == "valid"
+    ]
+    res = confirm_csv_import(
+        user_id="default_user",
+        file_name="dup.csv",
+        transactions=valid_txs,
+        db=db,
+        total_rows=preview.total_rows,
+        rejected_rows=preview.rejected_rows,
+        duplicate_rows=preview.duplicate_rows
+    )
+    assert res["total_rows"] == 4
+    assert res["accepted_count"] == 2
+    assert res["rejected_count"] == 1
+    assert res["duplicate_count"] == 1
+    assert res["total_rows"] == res["accepted_count"] + res["rejected_count"] + res["duplicate_count"]
+

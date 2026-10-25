@@ -165,3 +165,106 @@ def delete_transaction(
     cursor.execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (tx_id, user_id))
     db.commit()
     return {"message": "Transaction deleted successfully.", "id": tx_id}
+
+@router.get("/cashflow")
+def get_cashflow_summary(
+    user_id: str = "default_user",
+    period: str = Query("6m", pattern="^(6m|12m)$"),
+    db=Depends(get_db)
+):
+    months_count = 12 if period == "12m" else 6
+    cursor = db.cursor()
+    cursor.execute("""
+    SELECT 
+        SUBSTR(transaction_date, 1, 7) AS month_key,
+        SUM(CASE WHEN direction = 'income' OR direction = 'credit' THEN amount ELSE 0 END) AS total_income,
+        SUM(CASE WHEN direction = 'spending' OR direction = 'debit' THEN amount ELSE 0 END) AS total_expense,
+        COUNT(*) AS tx_count
+    FROM transactions
+    WHERE user_id = ?
+    GROUP BY SUBSTR(transaction_date, 1, 7)
+    ORDER BY month_key DESC
+    LIMIT ?
+    """, (user_id, months_count))
+    rows = cursor.fetchall()
+    
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    results = []
+    for r in reversed(rows):
+        m_key = r["month_key"]
+        if not m_key:
+            continue
+        try:
+            parts = m_key.split("-")
+            month_num = int(parts[1])
+            m_label = month_names[month_num - 1]
+        except Exception:
+            m_label = m_key
+
+        results.append({
+            "month_key": m_key,
+            "month": m_label,
+            "income": round(float(r["total_income"] or 0.0), 2),
+            "expense": round(float(r["total_expense"] or 0.0), 2),
+            "transaction_count": int(r["tx_count"] or 0)
+        })
+
+    tot_inc = sum(m["income"] for m in results)
+    tot_exp = sum(m["expense"] for m in results)
+    avg_exp = tot_exp / len(results) if results else 0.0
+    avg_inc = tot_inc / len(results) if results else 0.0
+    savings_rate = ((tot_inc - tot_exp) / tot_inc * 100.0) if tot_inc > 0 else 0.0
+
+    return {
+        "period": period,
+        "user_id": user_id,
+        "months": results,
+        "total_income": round(tot_inc, 2),
+        "total_spending": round(tot_exp, 2),
+        "total_expense": round(tot_exp, 2),
+        "avg_monthly_spending": round(avg_exp, 2),
+        "avg_monthly_income": round(avg_inc, 2),
+        "savings_rate_pct": round(savings_rate, 2)
+    }
+
+@router.get("/export")
+def export_transactions_csv(
+    user_id: str = "default_user",
+    db=Depends(get_db)
+):
+    from fastapi.responses import Response
+    import io
+    import csv
+
+    cursor = db.cursor()
+    cursor.execute("""
+    SELECT transaction_date, description, amount, direction, category, category_source, created_at
+    FROM transactions WHERE user_id = ? ORDER BY transaction_date DESC
+    """, (user_id,))
+    rows = cursor.fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["transaction_date", "description", "amount", "direction", "category", "category_source", "created_at"])
+    for r in rows:
+        writer.writerow([r["transaction_date"], r["description"], r["amount"], r["direction"], r["category"], r["category_source"], r["created_at"]])
+
+    csv_data = output.getvalue()
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=finsight_transactions_{user_id}.csv"}
+    )
+
+@router.delete("")
+def clear_all_transactions(
+    user_id: str = "default_user",
+    db=Depends(get_db)
+):
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM imports WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM recommendations WHERE user_id = ?", (user_id,))
+    db.commit()
+    return {"message": f"All transactions and history reset for {user_id}.", "deleted": True}
+

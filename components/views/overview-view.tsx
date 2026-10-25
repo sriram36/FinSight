@@ -33,6 +33,7 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cashflowPeriod, setCashflowPeriod] = useState<'6m' | '12m'>('6m')
+  const [cashflowData, setCashflowData] = useState<Array<{ month_key: string; month: string; income: number; expense: number; transaction_count: number }>>([])
 
   useEffect(() => {
     let mounted = true
@@ -40,11 +41,12 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
       setLoading(true)
       setError(null)
       try {
-        const [profileRes, txRes, recRes, goalsRes] = await Promise.allSettled([
+        const [profileRes, txRes, recRes, goalsRes, cashflowRes] = await Promise.allSettled([
           api.getProfile(),
           api.getTransactions({ limit: 10 }),
           api.getRecommendations(),
           api.getGoals(),
+          api.getCashflow(cashflowPeriod),
         ])
 
         if (!mounted) return
@@ -53,6 +55,9 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
         if (txRes.status === 'fulfilled') setTransactions(txRes.value.items)
         if (recRes.status === 'fulfilled') setRecommendations(recRes.value)
         if (goalsRes.status === 'fulfilled') setGoals(goalsRes.value)
+        if (cashflowRes.status === 'fulfilled' && cashflowRes.value?.months) {
+          setCashflowData(cashflowRes.value.months)
+        }
       } catch (err: any) {
         if (mounted) setError(err.message || 'Failed to fetch overview data')
       } finally {
@@ -65,6 +70,25 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
       mounted = false
     }
   }, [])
+
+  // Refetch cashflow when period changes
+  useEffect(() => {
+    let mounted = true
+    async function updateCashflow() {
+      try {
+        const res = await api.getCashflow(cashflowPeriod)
+        if (mounted && res?.months) {
+          setCashflowData(res.months)
+        }
+      } catch (err) {
+        console.warn('Failed to update cashflow for period:', err)
+      }
+    }
+    updateCashflow()
+    return () => {
+      mounted = false
+    }
+  }, [cashflowPeriod])
 
   // System C recommendation
   const systemCRec = useMemo(() => {
@@ -89,25 +113,8 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
     return ((totalRecentSpend - normalizedBaselineSpend) / normalizedBaselineSpend) * 100
   }, [totalRecentSpend, normalizedBaselineSpend])
 
-  // Monthly aggregated cashflow for the chart
-  const cashflowData = useMemo(() => {
-    // Generate buckets from recent profile or transactions
-    const months = ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May']
-    if (transactions.length === 0) {
-      return months.map(m => ({ month: m, income: 0, expense: 0 }))
-    }
-
-    // Default distribution for visualization
-    const avgExpense = totalRecentSpend > 0 ? totalRecentSpend / 3 : 25000
-    const avgIncome = avgExpense * 1.35
-    return months.map((m, idx) => ({
-      month: m,
-      income: Math.round(avgIncome * (0.85 + (idx % 3) * 0.15)),
-      expense: Math.round(avgExpense * (0.8 + (idx % 4) * 0.12)),
-    }))
-  }, [transactions, totalRecentSpend])
-
   const maxVal = useMemo(() => {
+    if (cashflowData.length === 0) return 1000
     const vals = cashflowData.flatMap(d => [d.income, d.expense])
     return Math.max(...vals, 1000)
   }, [cashflowData])
@@ -218,39 +225,46 @@ export function OverviewView({ onOpenImport, onNavigateTab }: OverviewViewProps)
           </div>
 
           <div className="p-5">
-            <div className="flex h-52 items-end gap-3 sm:gap-5">
-              <div className="flex h-full flex-col justify-between pb-2 text-[10px] text-muted-foreground">
-                <span>₹{(maxVal / 1000).toFixed(0)}k</span>
-                <span>₹{((maxVal * 0.66) / 1000).toFixed(0)}k</span>
-                <span>₹{((maxVal * 0.33) / 1000).toFixed(0)}k</span>
-                <span>₹0</span>
+            {cashflowData.length === 0 ? (
+              <div className="flex h-52 flex-col items-center justify-center text-center text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">No transaction history in this timeframe</p>
+                <p className="mt-1 max-w-xs">Upload statement CSV or switch timeframe to visualize empirical cashflow.</p>
               </div>
-              <div className="relative flex h-full flex-1 items-end justify-between gap-2 border-b border-l border-border px-2 pb-0 sm:px-5">
-                {cashflowData.map((d, index) => {
-                  const incomeH = maxVal > 0 ? (d.income / maxVal) * 100 : 0
-                  const expenseH = maxVal > 0 ? (d.expense / maxVal) * 100 : 0
-                  return (
-                    <div key={index} className="flex h-full flex-1 items-end justify-center gap-1 sm:gap-2">
-                      <div
-                        className="w-full max-w-6 rounded-t bg-primary/25 transition-all duration-300"
-                        style={{ height: `${Math.max(4, expenseH)}%` }}
-                        title={`Spending: ₹${d.expense}`}
-                      />
-                      <div
-                        className="w-full max-w-6 rounded-t bg-primary transition-all duration-300"
-                        style={{ height: `${Math.max(4, incomeH)}%` }}
-                        title={`Income: ₹${d.income}`}
-                      />
-                    </div>
-                  )
-                })}
-                <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2 text-[10px] text-muted-foreground">
-                  {cashflowData.map((d, i) => (
-                    <span key={i}>{d.month}</span>
-                  ))}
+            ) : (
+              <div className="flex h-52 items-end gap-3 sm:gap-5">
+                <div className="flex h-full flex-col justify-between pb-2 text-[10px] text-muted-foreground">
+                  <span>₹{(maxVal / 1000).toFixed(0)}k</span>
+                  <span>₹{((maxVal * 0.66) / 1000).toFixed(0)}k</span>
+                  <span>₹{((maxVal * 0.33) / 1000).toFixed(0)}k</span>
+                  <span>₹0</span>
+                </div>
+                <div className="relative flex h-full flex-1 items-end justify-between gap-2 border-b border-l border-border px-2 pb-0 sm:px-5">
+                  {cashflowData.map((d, index) => {
+                    const incomeH = maxVal > 0 ? (d.income / maxVal) * 100 : 0
+                    const expenseH = maxVal > 0 ? (d.expense / maxVal) * 100 : 0
+                    return (
+                      <div key={index} className="flex h-full flex-1 items-end justify-center gap-1 sm:gap-2">
+                        <div
+                          className="w-full max-w-6 rounded-t bg-primary/25 transition-all duration-300"
+                          style={{ height: `${Math.max(4, expenseH)}%` }}
+                          title={`Spending: ₹${d.expense.toLocaleString('en-IN')}`}
+                        />
+                        <div
+                          className="w-full max-w-6 rounded-t bg-primary transition-all duration-300"
+                          style={{ height: `${Math.max(4, incomeH)}%` }}
+                          title={`Income: ₹${d.income.toLocaleString('en-IN')}`}
+                        />
+                      </div>
+                    )
+                  })}
+                  <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2 text-[10px] text-muted-foreground">
+                    {cashflowData.map((d, i) => (
+                      <span key={i}>{d.month}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="mt-10 flex justify-center gap-6 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">

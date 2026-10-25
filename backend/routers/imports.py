@@ -47,7 +47,10 @@ def confirm_import_endpoint(
         user_id=req.user_id,
         file_name=req.file_name,
         transactions=tx_dicts,
-        db=db
+        db=db,
+        total_rows=req.total_rows,
+        rejected_rows=req.rejected_rows,
+        duplicate_rows=req.duplicate_rows
     )
     return result
 

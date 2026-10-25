@@ -40,7 +40,7 @@ The backend is packaged as a unified Docker image (`Dockerfile`) encapsulating b
 | Key | Recommended Value | Purpose |
 | :--- | :--- | :--- |
 | `APP_ENV` | `production` | Enforces production runtime logging and optimizations. |
-| `CORS_ORIGINS` | `https://finsight-wine-tau.vercel.app,http://localhost:3000` | Whitelists the Vercel frontend origin. Can use `*` for broad access. |
+| `CORS_ORIGINS` | `https://finsight-wine-tau.vercel.app,http://localhost:3000` | Whitelists authorized frontend origin(s). Wildcards (*) are forbidden when credentials are enabled. |
 | `DATABASE_URL` | *(Leave empty)* | When omitted or pointing to `localhost`, starts the embedded PostgreSQL server. |
 
 5. Trigger **Manual Deploy** → **Deploy latest commit**.

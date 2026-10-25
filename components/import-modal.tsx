@@ -8,7 +8,7 @@ import { CSVPreviewSummary } from '@/lib/types'
 
 interface ImportModalProps {
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (count?: number, result?: any) => void
 }
 
 export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
@@ -53,13 +53,16 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
           category_source: 'csv_import',
         }))
 
-      await api.confirmImport({
+      const result = await api.confirmImport({
         user_id: 'default_user',
         file_name: file.name,
         transactions: validTxs,
+        total_rows: preview.total_rows,
+        rejected_rows: preview.rejected_rows,
+        duplicate_rows: preview.duplicate_rows,
       })
 
-      onSuccess()
+      onSuccess(result.accepted_count, result)
       onClose()
     } catch (err: any) {
       setError(err.message || 'Failed to confirm import.')

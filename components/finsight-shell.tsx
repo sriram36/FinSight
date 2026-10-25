@@ -35,6 +35,7 @@ import { SimulateView } from '@/components/views/simulate-view'
 import { GoalsView } from '@/components/views/goals-view'
 import { ResearchView } from '@/components/views/research-view'
 import { ImportModal } from '@/components/import-modal'
+import { SettingsModal } from '@/components/settings-modal'
 
 const navItems = [
   { label: 'Overview', icon: LayoutDashboard },
@@ -50,6 +51,7 @@ export function FinSightShell() {
   const [mode, setMode] = useState<'personal' | 'research'>('personal')
   const [activeView, setActiveView] = useState('Overview')
   const [showImport, setShowImport] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [importNotification, setImportNotification] = useState<string | null>(null)
 
   const title = mode === 'research' ? 'Research Lab' : activeView
@@ -58,8 +60,12 @@ export function FinSightShell() {
       ? 'PersonaLedger synthetic benchmark · 70/30 temporal holdout · zero live data leakage'
       : 'Deterministic financial math with strict evidence-grounded AI recommendations'
 
-  const handleImportSuccess = (count: number) => {
-    setImportNotification(`Successfully imported and committed ${count} transactions into your local database.`)
+  const handleImportSuccess = (count: number, result?: any) => {
+    const dupCount = result?.duplicate_count ?? 0
+    const msg = dupCount > 0
+      ? `Successfully committed ${count} transaction${count === 1 ? '' : 's'} (${dupCount} duplicate${dupCount === 1 ? '' : 's'} skipped).`
+      : `Successfully committed ${count} transaction${count === 1 ? '' : 's'} into the database.`
+    setImportNotification(msg)
     setTimeout(() => setImportNotification(null), 6000)
   }
 
@@ -214,11 +220,11 @@ export function FinSightShell() {
               Research Lab
             </button>
             <button
-              onClick={() => alert('FinSight AI v1.0. SQLite database at finsight.db. Strict verifier enabled.')}
+              onClick={() => setShowSettings(true)}
               className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               <Settings2 className="size-4" />
-              Settings
+              Settings & Sandbox
             </button>
           </div>
         </nav>
@@ -265,7 +271,7 @@ export function FinSightShell() {
             <div>
               <p className="text-sm font-semibold">Good day, Jordan</p>
               <p className="hidden text-xs text-muted-foreground sm:block">
-                Local database connected · System C Verified Engine
+                Single-User Demo Sandbox · System C Verified Engine
               </p>
             </div>
           </div>
@@ -331,9 +337,19 @@ export function FinSightShell() {
       {showImport && (
         <ImportModal
           onClose={() => setShowImport(false)}
-          onSuccess={() => {
+          onSuccess={(count, result) => {
             setShowImport(false)
-            handleImportSuccess(248)
+            handleImportSuccess(count || 0, result)
+          }}
+        />
+      )}
+
+      {/* Settings & Sandbox Modal */}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onDataReset={() => {
+            setActiveView('Overview')
           }}
         />
       )}

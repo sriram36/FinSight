@@ -115,3 +115,6 @@ class CSVConfirmRequest(BaseModel):
     user_id: str = "default_user"
     file_name: str
     transactions: List[TransactionCreate]
+    total_rows: Optional[int] = None
+    rejected_rows: Optional[int] = 0
+    duplicate_rows: Optional[int] = 0

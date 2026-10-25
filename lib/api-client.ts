@@ -60,8 +60,22 @@ export const api = {
     return res.json()
   },
 
-  confirmImport: (data: { user_id: string; file_name: string; transactions: any[] }) =>
-    request<{ import_id: string; accepted_count: number; file_name: string }>('/imports/confirm', {
+  confirmImport: (data: {
+    user_id: string
+    file_name: string
+    transactions: any[]
+    total_rows?: number
+    rejected_rows?: number
+    duplicate_rows?: number
+  }) =>
+    request<{
+      import_id: string
+      total_rows: number
+      accepted_count: number
+      rejected_count: number
+      duplicate_count: number
+      file_name: string
+    }>('/imports/confirm', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -102,6 +116,16 @@ export const api = {
 
   deleteTransaction: (id: string, userId: string = 'default_user') =>
     request<{ message: string; id: string }>(`/transactions/${id}?user_id=${userId}`, {
+      method: 'DELETE',
+    }),
+
+  getCashflow: (period: string = '6m', userId: string = 'default_user') =>
+    request<{ period: string; user_id: string; months: Array<{ month_key: string; month: string; income: number; expense: number; transaction_count: number }> }>(
+      `/transactions/cashflow?period=${period}&user_id=${userId}`
+    ),
+
+  clearAllTransactions: (userId: string = 'default_user') =>
+    request<{ message: string }>(`/transactions?user_id=${userId}`, {
       method: 'DELETE',
     }),
 

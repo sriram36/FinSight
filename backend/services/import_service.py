@@ -156,6 +156,7 @@ def parse_csv_preview(
     cursor = db.cursor()
     cursor.execute("SELECT transaction_date, description, amount FROM transactions WHERE user_id = ?", (user_id,))
     existing_txs = {(r[0], r[1].lower().strip(), round(float(r[2]), 2)) for r in cursor.fetchall()}
+    seen_in_file = set()
 
     for idx, row in enumerate(reader, start=1):
         err = None
@@ -220,13 +221,16 @@ def parse_csv_preview(
             if direction == TransactionDirection.INCOME and category == "Uncategorized":
                 category = "Income"
 
-        # Duplicate check
+        # Duplicate check (existing DB + within-file duplicates)
         status = "valid"
         if not err and parsed_date and desc and amount is not None:
-            if (parsed_date, desc.lower().strip(), round(amount, 2)) in existing_txs:
+            tx_sig = (parsed_date, desc.lower().strip(), round(amount, 2))
+            if tx_sig in existing_txs or tx_sig in seen_in_file:
                 status = "duplicate"
                 duplicates += 1
+                err = "Duplicate transaction (matches existing record or repeated in file)"
             else:
+                seen_in_file.add(tx_sig)
                 accepted += 1
         else:
             status = "error"
@@ -259,20 +263,43 @@ def confirm_csv_import(
     user_id: str,
     file_name: str,
     transactions: List[Dict[str, Any]],
-    db
+    db,
+    total_rows: Optional[int] = None,
+    rejected_rows: Optional[int] = 0,
+    duplicate_rows: Optional[int] = 0
 ) -> Dict[str, Any]:
     import_id = f"imp_{uuid.uuid4().hex[:12]}"
     now_iso = datetime.now(timezone.utc).isoformat()
 
-
     cursor = db.cursor()
+    cursor.execute("SELECT transaction_date, description, amount FROM transactions WHERE user_id = ?", (user_id,))
+    existing_txs = {(r[0], r[1].lower().strip(), round(float(r[2]), 2)) for r in cursor.fetchall()}
+    seen_in_batch = set()
+
     accepted_count = 0
+    batch_duplicates = 0
+    batch_rejected = 0
 
     for tx in transactions:
-        tx_id = f"tx_{uuid.uuid4().hex[:12]}"
         date_str = tx.get("transaction_date")
         desc = tx.get("description", "Imported transaction")
-        amount = abs(float(tx.get("amount", 0.0)))
+        try:
+            amount = abs(float(tx.get("amount", 0.0)))
+        except (ValueError, TypeError):
+            batch_rejected += 1
+            continue
+
+        if not date_str or not desc or amount == 0.0:
+            batch_rejected += 1
+            continue
+
+        sig = (date_str, desc.lower().strip(), round(amount, 2))
+        if sig in existing_txs or sig in seen_in_batch:
+            batch_duplicates += 1
+            continue
+
+        seen_in_batch.add(sig)
+        tx_id = f"tx_{uuid.uuid4().hex[:12]}"
         direction = tx.get("direction", "spending")
         category = tx.get("category", "Uncategorized")
         cat_src = tx.get("category_source", "csv_import")
@@ -288,19 +315,26 @@ def confirm_csv_import(
         ))
         accepted_count += 1
 
+    total_duplicate_count = (duplicate_rows or 0) + batch_duplicates
+    total_rejected_count = (rejected_rows or 0) + batch_rejected
+    actual_total_rows = total_rows if total_rows is not None else (accepted_count + total_duplicate_count + total_rejected_count)
+
     cursor.execute("""
     INSERT INTO imports (
         id, user_id, file_name, total_rows, accepted_rows, rejected_rows,
         duplicate_rows, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        import_id, user_id, file_name, len(transactions), accepted_count, 0, 0, now_iso
+        import_id, user_id, file_name, actual_total_rows, accepted_count, total_rejected_count, total_duplicate_count, now_iso
     ))
 
     db.commit()
     return {
         "import_id": import_id,
+        "total_rows": actual_total_rows,
         "accepted_count": accepted_count,
+        "rejected_count": total_rejected_count,
+        "duplicate_count": total_duplicate_count,
         "file_name": file_name,
         "created_at": now_iso
     }
