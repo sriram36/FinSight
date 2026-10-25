@@ -46,6 +46,38 @@ $$\max_{t \in \mathcal{T}_{\text{baseline}}} \tau(t) < \min_{t \in \mathcal{T}_{
 
 The endpoint `POST /research/split` executes this check deterministically, returning the exact date ranges and transaction counts for both partitions.
 
+```mermaid
+flowchart TD
+    subgraph DataPrep ["1. Ingestion & Partitioning"]
+        Raw["PersonaLedger Dataset (1,000 Rows, Seed 42)"] --> Sort["Chronological Timestamp Sort"]
+        Sort --> Split{"70 / 30 Temporal Split"}
+        Split --> Baseline["Baseline Partition: T_baseline (700 txs)"]
+        Split --> Holdout["Holdout Partition: T_holdout (300 txs)"]
+        Baseline -. Verified: max(t_base) < min(t_holdout) .-> Holdout
+    end
+
+    subgraph Benchmarking ["2. Multi-System Evaluation"]
+        Holdout --> Engine["4-System Recommendation Engine"]
+        Engine --> RecA["System A: Rule Baseline (25%)"]
+        Engine --> RecB["System B: Profile Conditioned"]
+        Engine --> RecAbl["System B-Ablation: Heuristic"]
+        Engine --> RecC["System C: Grounded Receipts"]
+    end
+
+    subgraph Verification ["3. Numeric Claim Verification"]
+        RecC --> Verifier["Claim Verifier (1.5% Tolerance)"]
+        Verifier --> CVR["Compute Claim Verification Rate"]
+        Verifier --> EGP["Compute Grounding Precision"]
+    end
+
+    subgraph StressTest ["4. Controlled Perturbation Shock"]
+        Holdout --> Shock["Inject +150% Spending Shock"]
+        Shock --> ShockHoldout["Perturbed Holdout Window"]
+        ShockHoldout --> ReEval["Re-evaluate System C & A"]
+        ReEval --> Sensitivity["Verify Anomaly Detection Sensitivity"]
+    end
+```
+
 ---
 
 ## 3. Evaluation Metrics & Benchmark Criteria
