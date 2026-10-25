@@ -1,12 +1,20 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
+from backend.database import init_db
 from backend.routers import health, imports, transactions, profile, goals, scenarios, recommendations, research
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Evidence-grounded personal finance decision support and research evaluation API."
+    description="Evidence-grounded personal finance decision support and research evaluation API.",
+    lifespan=lifespan
 )
 
 app.add_middleware(
