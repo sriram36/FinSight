@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import {
   X,
   Download,
@@ -10,7 +11,11 @@ import {
   CheckCircle2,
   Loader2,
   Server,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Sun,
+  Moon,
+  Monitor,
+  Palette
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -18,9 +23,11 @@ import { api } from '@/lib/api-client'
 interface SettingsModalProps {
   onClose: () => void
   onDataReset?: () => void
+  currentTheme?: 'light' | 'dark' | 'system'
+  onThemeChange?: (theme: 'light' | 'dark' | 'system') => void
 }
 
-export function SettingsModal({ onClose, onDataReset }: SettingsModalProps) {
+export function SettingsModal({ onClose, onDataReset, currentTheme = 'system', onThemeChange }: SettingsModalProps) {
   const [resetting, setResetting] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -63,13 +70,18 @@ export function SettingsModal({ onClose, onDataReset }: SettingsModalProps) {
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border p-5">
-          <div>
-            <h2 id="settings-modal-title" className="text-lg font-semibold tracking-tight text-foreground">
-              System Settings & Demo Sandbox
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Configuration boundaries, data export, and session management.
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="relative flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 p-1 shadow-xs">
+              <Image src="/logo.svg" alt="FinSight Logo" width={24} height={24} className="size-6 object-contain" />
+            </div>
+            <div>
+              <h2 id="settings-modal-title" className="text-base font-semibold tracking-tight text-foreground">
+                System Settings & Appearance
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Configuration boundaries, theme preferences, and demo sandbox.
+              </p>
+            </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close dialog">
             <X className="size-4" />
@@ -84,6 +96,69 @@ export function SettingsModal({ onClose, onDataReset }: SettingsModalProps) {
               <span>{error}</span>
             </div>
           )}
+
+          {resetSuccess && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+              <span>Session transactions and evaluation cache successfully cleared.</span>
+            </div>
+          )}
+
+          {/* Theme & Visual Appearance */}
+          <section className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Palette className="size-3.5 text-primary" /> Appearance & Color Theme
+              </h3>
+              <span className="text-[11px] text-muted-foreground">
+                Active: <span className="font-semibold text-foreground capitalize">{currentTheme}</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => onThemeChange && onThemeChange('light')}
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-3 text-xs font-medium transition-all ${
+                  currentTheme === 'light'
+                    ? 'border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary'
+                    : 'border-border/70 bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                }`}
+              >
+                <Sun className="size-4 text-amber-500" />
+                <span>Light</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onThemeChange && onThemeChange('dark')}
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-3 text-xs font-medium transition-all ${
+                  currentTheme === 'dark'
+                    ? 'border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary'
+                    : 'border-border/70 bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                }`}
+              >
+                <Moon className="size-4 text-primary" />
+                <span>Dark</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onThemeChange && onThemeChange('system')}
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-3 text-xs font-medium transition-all ${
+                  currentTheme === 'system'
+                    ? 'border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary'
+                    : 'border-border/70 bg-card text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                }`}
+              >
+                <Monitor className="size-4 text-primary" />
+                <span>System Auto</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground/80 leading-normal">
+              Theme applies instantly and saves across sessions. You can also toggle it directly from the top navigation bar.
+            </p>
+          </section>
 
           {resetSuccess && (
             <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-400">

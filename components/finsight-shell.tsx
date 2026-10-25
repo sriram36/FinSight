@@ -27,7 +27,10 @@ import {
   WalletCards,
   X,
   Zap,
-  ArrowUpRight
+  ArrowUpRight,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OverviewView } from '@/components/views/overview-view'
@@ -123,6 +126,33 @@ export function FinSightShell() {
     token: 'tok_demo_jordan_sandbox',
     is_demo: true,
   })
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+
+  const applyTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    if (typeof window === 'undefined') return
+    const root = document.documentElement
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isDark = newTheme === 'dark' || (newTheme === 'system' && prefersDark)
+    if (isDark) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }
+
+  const setThemeMode = (mode: 'light' | 'dark' | 'system') => {
+    setTheme(mode)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finsight_theme', mode)
+    }
+    applyTheme(mode)
+  }
+
+  const toggleTheme = () => {
+    const next: 'light' | 'dark' | 'system' =
+      theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
+    setThemeMode(next)
+  }
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -134,6 +164,20 @@ export function FinSightShell() {
           // ignore
         }
       }
+
+      const savedTheme = (localStorage.getItem('finsight_theme') as 'light' | 'dark' | 'system') || 'system'
+      setTheme(savedTheme)
+      applyTheme(savedTheme)
+
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      const handleChange = () => {
+        const curTheme = localStorage.getItem('finsight_theme') || 'system'
+        if (curTheme === 'system') {
+          applyTheme('system')
+        }
+      }
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
     }
   }, [])
 
@@ -214,8 +258,8 @@ export function FinSightShell() {
         {/* Brand */}
         <div className="flex items-center justify-between px-1 mb-6">
           <div className="flex items-center gap-3">
-            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-sm">
-              <Zap className="size-5 text-primary" />
+            <div className="relative flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-sm p-1.5">
+              <Image src="/logo.svg" alt="FinSight AI Logo" width={28} height={28} className="size-7 object-contain drop-shadow-xs" priority />
               <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 border-2 border-sidebar animate-pulse" />
             </div>
             <div>
@@ -431,6 +475,31 @@ export function FinSightShell() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Theme Switcher Button */}
+            <button
+              onClick={toggleTheme}
+              title={`Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)} (Click to switch)`}
+              aria-label="Toggle color theme"
+              className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/80 px-2.5 py-1 text-xs font-semibold hover:border-primary/30 hover:bg-primary/5 transition-all duration-150 shadow-xs h-8 text-muted-foreground hover:text-foreground"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Moon className="size-3.5 text-primary" />
+                  <span className="hidden md:inline text-[11px] font-medium">Dark</span>
+                </>
+              ) : theme === 'light' ? (
+                <>
+                  <Sun className="size-3.5 text-amber-500" />
+                  <span className="hidden md:inline text-[11px] font-medium">Light</span>
+                </>
+              ) : (
+                <>
+                  <Monitor className="size-3.5 text-primary" />
+                  <span className="hidden md:inline text-[11px] font-medium">System</span>
+                </>
+              )}
+            </button>
+
             <Button
               variant="outline"
               size="sm"
@@ -511,6 +580,8 @@ export function FinSightShell() {
         <SettingsModal
           onClose={() => setShowSettings(false)}
           onDataReset={() => setActiveView('Overview')}
+          currentTheme={theme}
+          onThemeChange={setThemeMode}
         />
       )}
       {showAuthModal && (

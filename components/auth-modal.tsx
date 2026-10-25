@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import { X, Lock, Mail, User, ShieldCheck, Check, AlertCircle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -73,8 +74,10 @@ export function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         </button>
 
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Lock className="size-5 text-primary" />
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <div className="relative flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 p-1 shadow-xs">
+              <Image src="/logo.svg" alt="FinSight Logo" width={22} height={22} className="size-5.5 object-contain" />
+            </div>
             <h2 className="text-lg font-bold tracking-tight">
               {isRegister ? 'Create FinSight Account' : 'Sign In to FinSight'}
             </h2>
