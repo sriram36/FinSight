@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     APP_ENV: str = os.getenv("APP_ENV", "development")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./finsight.db")
     CORS_ORIGINS: list[str] | str = [
+        "https://finsight-wine-tau.vercel.app",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000"

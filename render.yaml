@@ -12,6 +12,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://finsight-wine-tau.vercel.app,http://localhost:3000,*"
       - key: DATABASE_URL
         value: sqlite:///./finsight.db
