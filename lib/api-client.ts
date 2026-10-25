@@ -197,4 +197,15 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+
+  // Research Lab
+  getResearchAudit: () => request<any>('/research/audit'),
+  getTemporalSplit: () => request<any>('/research/split'),
+  getBenchmark: () => request<any[]>('/research/benchmark'),
+  runPerturbation: (data?: { seed?: number; target_category?: string; delta_pct?: number }) =>
+    request<any>('/research/perturbation', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
 }
+
