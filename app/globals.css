@@ -2,7 +2,7 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark, .dark *));
 
 @theme inline {
   /* Sidebar tokens */
@@ -105,7 +105,7 @@
 }
 
 /* ─── Dark Mode ─────────────────────────────────────────────────────── */
-.dark {
+.dark, [data-theme="dark"] {
   color-scheme: dark;
   --background: oklch(0.12 0.012 248);
   --foreground: oklch(0.96 0.005 248);
@@ -148,43 +148,6 @@
   --sidebar-accent-foreground: oklch(0.92 0.006 248);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.64 0.17 190);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    color-scheme: dark;
-    --background: oklch(0.12 0.012 248);
-    --foreground: oklch(0.96 0.005 248);
-    --card: oklch(0.16 0.014 248);
-    --card-foreground: oklch(0.96 0.005 248);
-    --popover: oklch(0.18 0.014 248);
-    --popover-foreground: oklch(0.96 0.005 248);
-    --primary: oklch(0.64 0.17 190);
-    --primary-foreground: oklch(0.1 0.01 248);
-    --secondary: oklch(0.22 0.016 248);
-    --secondary-foreground: oklch(0.92 0.006 248);
-    --muted: oklch(0.21 0.015 248);
-    --muted-foreground: oklch(0.62 0.016 248);
-    --accent: oklch(0.24 0.018 260);
-    --accent-foreground: oklch(0.92 0.006 248);
-    --destructive: oklch(0.68 0.2 22);
-    --border: oklch(1 0 0 / 9%);
-    --input: oklch(1 0 0 / 12%);
-    --ring: oklch(0.64 0.17 190);
-    --chart-1: oklch(0.68 0.2 195);
-    --chart-2: oklch(0.62 0.2 255);
-    --chart-3: oklch(0.66 0.19 160);
-    --chart-4: oklch(0.72 0.18 42);
-    --chart-5: oklch(0.64 0.21 310);
-    --sidebar: oklch(0.14 0.014 248);
-    --sidebar-foreground: oklch(0.96 0.005 248);
-    --sidebar-primary: oklch(0.64 0.17 190);
-    --sidebar-primary-foreground: oklch(0.1 0.01 248);
-    --sidebar-accent: oklch(0.22 0.016 248);
-    --sidebar-accent-foreground: oklch(0.92 0.006 248);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.64 0.17 190);
-  }
 }
 
 /* ─── Base Layer ────────────────────────────────────────────────────── */

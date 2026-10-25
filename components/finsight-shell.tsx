@@ -135,8 +135,14 @@ export function FinSightShell() {
     const isDark = newTheme === 'dark' || (newTheme === 'system' && prefersDark)
     if (isDark) {
       root.classList.add('dark')
+      root.classList.remove('light')
+      root.setAttribute('data-theme', 'dark')
+      root.style.colorScheme = 'dark'
     } else {
       root.classList.remove('dark')
+      root.classList.add('light')
+      root.setAttribute('data-theme', 'light')
+      root.style.colorScheme = 'light'
     }
   }
 
@@ -149,9 +155,9 @@ export function FinSightShell() {
   }
 
   const toggleTheme = () => {
-    const next: 'light' | 'dark' | 'system' =
-      theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
-    setThemeMode(next)
+    const isCurrentlyDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    const nextMode: 'light' | 'dark' = isCurrentlyDark ? 'light' : 'dark'
+    setThemeMode(nextMode)
   }
 
   useEffect(() => {
@@ -478,24 +484,19 @@ export function FinSightShell() {
             {/* Theme Switcher Button */}
             <button
               onClick={toggleTheme}
-              title={`Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)} (Click to switch)`}
+              title={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
               aria-label="Toggle color theme"
-              className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/80 px-2.5 py-1 text-xs font-semibold hover:border-primary/30 hover:bg-primary/5 transition-all duration-150 shadow-xs h-8 text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/80 px-2.5 py-1 text-xs font-semibold hover:border-primary/30 hover:bg-primary/5 transition-all duration-150 shadow-xs h-8 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               {theme === 'dark' ? (
                 <>
-                  <Moon className="size-3.5 text-primary" />
-                  <span className="hidden md:inline text-[11px] font-medium">Dark</span>
-                </>
-              ) : theme === 'light' ? (
-                <>
-                  <Sun className="size-3.5 text-amber-500" />
-                  <span className="hidden md:inline text-[11px] font-medium">Light</span>
+                  <Sun className="size-3.5 text-amber-400" />
+                  <span className="text-[11px] font-medium text-foreground">Light</span>
                 </>
               ) : (
                 <>
-                  <Monitor className="size-3.5 text-primary" />
-                  <span className="hidden md:inline text-[11px] font-medium">System</span>
+                  <Moon className="size-3.5 text-primary" />
+                  <span className="text-[11px] font-medium text-foreground">Dark</span>
                 </>
               )}
             </button>
