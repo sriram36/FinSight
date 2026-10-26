@@ -121,6 +121,16 @@ export interface AffordabilityGoalImpact {
   is_delayed: boolean
 }
 
+export interface EvidenceBundle {
+  transaction_ids: string[]
+  exact_sum: number
+  baseline_sum: number
+  delta_pct: number
+  verification_status: 'VERIFIED' | 'UNVERIFIED' | string
+  verifier_notes?: string
+  [key: string]: any
+}
+
 export interface AffordabilityResponse {
   purchase_amount: number
   available_balance?: number | null
@@ -134,6 +144,28 @@ export interface AffordabilityResponse {
   missing_inputs: string[]
   assumptions: string[]
   goal_impacts: AffordabilityGoalImpact[]
+  survival_probability?: number | null
+  constraint_violations?: Array<{
+    constraint_type: string
+    label: string
+    amount: number
+    breach_day: number
+    breach_date: string
+    projected_balance: number
+    message: string
+  }>
+  counterfactual_alternatives?: Array<{
+    action: string
+    label: string
+    detail: string
+  }>
+  runway_timeline?: Array<{
+    day: number
+    date: string
+    projected_balance: number
+    below_floor: boolean
+  }>
+  evidence_bundle?: EvidenceBundle | null
 }
 
 export interface Goal {
@@ -275,6 +307,34 @@ export interface CategoryComparison {
   pct_change: number
 }
 
+export interface SpendingAttributionCard {
+  category: string
+  driver: 'frequency_drift' | 'ticket_size_inflation' | string
+  frequency_current: number
+  frequency_baseline: number
+  avg_ticket_current: number
+  avg_ticket_baseline: number
+  frequency_effect: number
+  ticket_size_effect: number
+  current_spend: number
+  previous_spend: number
+  evidence_bundle: EvidenceBundle
+}
+
+export interface SpendingAttributionResponse {
+  cards: SpendingAttributionCard[]
+  card_count: number
+}
+
+export interface LateNightVelocityResponse {
+  current_count: number
+  baseline_count: number
+  current_spend: number
+  baseline_spend: number
+  evidence_bundle: EvidenceBundle
+  headline: string
+}
+
 export interface MonthlyReviewResponse {
   month: string
   previous_month: string
@@ -292,6 +352,91 @@ export interface MonthlyReviewResponse {
   anomalies: AnomalyItem[]
   narrative: string
   transaction_count: number
+  spending_attribution?: SpendingAttributionResponse
+  late_night_velocity?: LateNightVelocityResponse
+}
+
+export type ConstraintType = 'HARD_FLOOR' | 'FIXED_OBLIGATION' | 'BEHAVIORAL_CAP' | 'PENDING_IOU'
+
+export interface UserConstraint {
+  id: string
+  user_id: string
+  constraint_type: ConstraintType
+  label: string
+  amount: number
+  due_day?: number | null
+  is_active: boolean
+  metadata?: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface UserConstraintCreate {
+  user_id?: string
+  constraint_type: ConstraintType
+  label: string
+  amount: number
+  due_day?: number | null
+  is_active?: boolean
+  metadata?: Record<string, any>
+}
+
+export interface SafeToSpendResponse {
+  user_id: string
+  raw_balance: number
+  safe_to_spend_today: number
+  locked_by_constraints: number
+  unpaid_fixed_obligations: number
+  hard_floor: number
+  predicted_essential_burn: number
+  remaining_days_in_cycle: number
+  runway_days_remaining: number
+  next_inflow_date?: string | null
+  active_constraints: UserConstraint[]
+  assumptions: string[]
+  calculated_at: string
+}
+
+export interface UPIContextCluster {
+  cluster_id: string
+  cluster_key: string
+  counterparty: string
+  time_of_day_bucket: string
+  ticket_size_band: string
+  transaction_count: number
+  transaction_ids: string[]
+  exact_sum: number
+  average_amount: number
+  suggested_category: string
+  prompt: string
+  likely_split_bill: boolean
+  sample_descriptions: string[]
+}
+
+export interface ContextPromptsResponse {
+  user_id: string
+  cluster_count: number
+  clusters: UPIContextCluster[]
+}
+
+export interface ResolveClusterRequest {
+  user_id?: string
+  cluster_key: string
+  category: string
+  register_iou?: boolean
+  iou_label?: string
+}
+
+export interface DefenseEngineMetrics {
+  experiment_name: string
+  claim_verification_faithfulness_rate: number
+  claim_verification_faithfulness_rate_display: string
+  constraint_satisfaction_accuracy: number
+  upi_context_clustering_coverage: number
+  upi_ambiguous_transfers: number
+  upi_clustered_transfers: number
+  notes: string[]
+  benchmark_systems: any[]
 }
 
 export interface AuthUser {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import {
+  Activity,
   AlertTriangle,
   BarChart3,
   Bell,
@@ -53,6 +54,7 @@ import { AuthUser } from '@/lib/types'
 
 interface NavItem {
   label: string
+  pillar: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
   badgeClass?: string
@@ -66,47 +68,48 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    title: 'Daily Finance',
-    items: [
-      { label: 'Overview', icon: LayoutDashboard, description: 'Financial snapshot' },
-      { label: 'Transactions', icon: WalletCards, description: 'Full ledger history' },
-      { label: 'Budgets', icon: PieChart, description: 'Spending limits' },
-      { label: 'Subscriptions', icon: Repeat, description: 'Recurring payments' },
-    ],
-  },
-  {
-    title: 'AI Intelligence',
+    title: 'Core Product Pillars',
     items: [
       {
-        label: 'Ask FinSight',
-        icon: MessageSquareText,
-        badge: 'AI',
+        label: 'Command Center',
+        pillar: 'Command Center',
+        icon: LayoutDashboard,
+        badge: 'Safe-to-Spend',
         badgeClass: 'badge-teal',
-        description: 'Copilot chat'
+        description: 'Safe-to-Spend · Constraints · Ledger',
       },
       {
-        label: 'Verified Insights',
-        icon: Sparkles,
-        badge: 'System C',
+        label: 'Decision Simulator',
+        pillar: 'Decision Simulator',
+        icon: BarChart3,
+        badge: 'Stress-Test',
         badgeClass: 'badge-violet',
-        description: 'Evidence-grounded'
+        description: 'Can I Afford This? · EMI · Goals',
       },
       {
-        label: 'Unusual Spending',
-        icon: AlertTriangle,
-        badge: 'Live',
+        label: 'Behavioral Autopsy',
+        pillar: 'Behavioral Autopsy',
+        icon: Activity,
+        badge: 'Delta Engine',
         badgeClass: 'badge-amber',
-        description: 'Anomaly detection'
+        description: 'Frequency Drift · Drains · Citations',
       },
-      { label: 'Cash Flow Forecast', icon: TrendingUp, description: 'Future projections' },
-    ],
-  },
-  {
-    title: 'Planning',
-    items: [
-      { label: 'Goals', icon: Target, description: 'Savings milestones' },
-      { label: 'Monthly Review', icon: FileText, description: 'Period summary' },
-      { label: 'Simulate', icon: BarChart3, description: 'Scenario modelling' },
+      {
+        label: 'AI CFO Co-Pilot',
+        pillar: 'AI CFO Co-Pilot',
+        icon: MessageSquareText,
+        badge: 'Verified',
+        badgeClass: 'badge-emerald',
+        description: 'Conversational CFO · AST Claim Guard',
+      },
+      {
+        label: 'Research Lab',
+        pillar: 'Research Lab',
+        icon: FlaskConical,
+        badge: 'Empirical',
+        badgeClass: 'badge-indigo',
+        description: 'PersonaLedger · Defense Benchmark',
+      },
     ],
   },
 ]
@@ -114,7 +117,10 @@ const navGroups: NavGroup[] = [
 export function FinSightShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [mode, setMode] = useState<'personal' | 'research'>('personal')
-  const [activeView, setActiveView] = useState('Overview')
+  const [activeView, setActiveView] = useState('Command Center')
+  const [overviewSubTab, setOverviewSubTab] = useState<'overview' | 'transactions' | 'budgets' | 'profile'>('overview')
+  const [simulateSubTab, setSimulateSubTab] = useState<'simulator' | 'forecast' | 'goals'>('simulator')
+  const [reviewSubTab, setReviewSubTab] = useState<'autopsy' | 'recurring' | 'anomalies' | 'recommendations'>('autopsy')
   const [showImport, setShowImport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -187,11 +193,68 @@ export function FinSightShell() {
     }
   }, [])
 
-  const title = mode === 'research' ? 'Research Lab' : activeView
+  const handleNavigateTab = (tab: string) => {
+    const t = tab.toLowerCase()
+    if (t.includes('transaction') || t.includes('ledger')) {
+      setActiveView('Command Center')
+      setOverviewSubTab('transactions')
+      setMode('personal')
+    } else if (t.includes('budget')) {
+      setActiveView('Command Center')
+      setOverviewSubTab('budgets')
+      setMode('personal')
+    } else if (t.includes('profile') || t.includes('protect')) {
+      setActiveView('Command Center')
+      setOverviewSubTab('profile')
+      setMode('personal')
+    } else if (t.includes('simulate') || t.includes('afford')) {
+      setActiveView('Decision Simulator')
+      setSimulateSubTab('simulator')
+      setMode('personal')
+    } else if (t.includes('forecast')) {
+      setActiveView('Decision Simulator')
+      setSimulateSubTab('forecast')
+      setMode('personal')
+    } else if (t.includes('goal')) {
+      setActiveView('Decision Simulator')
+      setSimulateSubTab('goals')
+      setMode('personal')
+    } else if (t.includes('recurring') || t.includes('subscri') || t.includes('drain')) {
+      setActiveView('Behavioral Autopsy')
+      setReviewSubTab('recurring')
+      setMode('personal')
+    } else if (t.includes('anomal') || t.includes('unusual')) {
+      setActiveView('Behavioral Autopsy')
+      setReviewSubTab('anomalies')
+      setMode('personal')
+    } else if (t.includes('recommend') || t.includes('insight')) {
+      setActiveView('Behavioral Autopsy')
+      setReviewSubTab('recommendations')
+      setMode('personal')
+    } else if (t.includes('chat') || t.includes('copilot') || t.includes('ask')) {
+      setActiveView('AI CFO Co-Pilot')
+      setMode('personal')
+    } else if (t.includes('research')) {
+      setMode('research')
+      setActiveView('Research Lab')
+    } else {
+      setActiveView('Command Center')
+      setOverviewSubTab('overview')
+      setMode('personal')
+    }
+  }
+
+  const title = mode === 'research' || activeView === 'Research Lab' ? 'Research Lab' : activeView
   const subtitle =
-    mode === 'research'
+    mode === 'research' || activeView === 'Research Lab'
       ? 'PersonaLedger synthetic benchmark · 70/30 temporal holdout · zero live data leakage'
-      : 'Deterministic financial math with strict evidence-grounded AI recommendations'
+      : activeView === 'Command Center'
+      ? 'True Safe-to-Spend (₹/day) · Persistent Constraint Memory · Smart UPI Context Stitcher'
+      : activeView === 'Decision Simulator'
+      ? 'Pre-Purchase & EMI Counterfactual Stress-Tester · 30–90 Day Cash-Flow Runway'
+      : activeView === 'Behavioral Autopsy'
+      ? 'Root-Cause Delta Engine · Frequency Drift vs Inflation · Phantom Drain Hunter'
+      : 'Constraint-Aware Conversational CFO · Strict Evidence-Grounded Citations'
 
   const handleImportSuccess = (count: number, result?: any) => {
     const dupCount = result?.duplicate_count ?? 0
@@ -204,36 +267,37 @@ export function FinSightShell() {
   }
 
   const renderActiveView = () => {
-    if (mode === 'research') return <ResearchView />
+    if (mode === 'research' || activeView === 'Research Lab') {
+      return <ResearchView />
+    }
     switch (activeView) {
+      case 'Command Center':
       case 'Overview':
-        return <OverviewView onOpenImport={() => setShowImport(true)} onNavigateTab={(tab) => setActiveView(tab)} />
+        return (
+          <OverviewView
+            initialSubTab={overviewSubTab}
+            onOpenImport={() => setShowImport(true)}
+            onNavigateTab={handleNavigateTab}
+          />
+        )
+      case 'Decision Simulator':
+      case 'Simulate':
+        return <SimulateView initialSubTab={simulateSubTab} />
+      case 'Behavioral Autopsy':
+      case 'Monthly Review':
+      case 'Review':
+        return <ReviewView initialSubTab={reviewSubTab} />
+      case 'AI CFO Co-Pilot':
       case 'Ask FinSight':
         return <ChatView />
-      case 'Verified Insights':
-      case 'Recommendations':
-        return <RecommendationsView onOpenImport={() => setShowImport(true)} />
-      case 'Unusual Spending':
-        return <AnomaliesView />
-      case 'Cash Flow Forecast':
-        return <ForecastView />
-      case 'Monthly Review':
-        return <ReviewView />
-      case 'Budgets':
-        return <BudgetsView />
-      case 'Subscriptions':
-      case 'Recurring':
-        return <RecurringView />
-      case 'Transactions':
-        return <TransactionsView onOpenImport={() => setShowImport(true)} />
-      case 'Profile':
-        return <ProfileView onOpenImport={() => setShowImport(true)} />
-      case 'Simulate':
-        return <SimulateView />
-      case 'Goals':
-        return <GoalsView />
       default:
-        return <OverviewView onOpenImport={() => setShowImport(true)} onNavigateTab={(tab) => setActiveView(tab)} />
+        return (
+          <OverviewView
+            initialSubTab={overviewSubTab}
+            onOpenImport={() => setShowImport(true)}
+            onNavigateTab={handleNavigateTab}
+          />
+        )
     }
   }
 
@@ -292,7 +356,7 @@ export function FinSightShell() {
           <p className="section-label mb-2">Workspace</p>
           <div className="flex rounded-xl bg-muted/50 p-1 border border-border/60 gap-0.5">
             <button
-              onClick={() => { setMode('personal'); if (mode === 'research') setActiveView('Overview') }}
+              onClick={() => { setMode('personal'); if (activeView === 'Research Lab') setActiveView('Command Center') }}
               className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-all duration-150 ${
                 mode === 'personal'
                   ? 'bg-background text-foreground shadow-sm border border-border/50'
@@ -302,7 +366,7 @@ export function FinSightShell() {
               Personal
             </button>
             <button
-              onClick={() => setMode('research')}
+              onClick={() => { setMode('research'); setActiveView('Research Lab') }}
               className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-all duration-150 ${
                 mode === 'research'
                   ? 'bg-background text-foreground shadow-sm border border-border/50'
@@ -316,63 +380,59 @@ export function FinSightShell() {
 
         {/* Nav groups */}
         <nav className="flex-1 space-y-5" aria-label="Primary navigation">
-          {mode === 'personal' ? (
-            navGroups.map((group) => (
-              <div key={group.title}>
-                <p className="section-label mb-2 px-1">{group.title}</p>
-                <div className="flex flex-col gap-0.5">
-                  {group.items.map((item) => {
-                    const isActive = activeView === item.label
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={() => { setActiveView(item.label); setMobileNavOpen(false) }}
-                        className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-all duration-150 ${
+          {navGroups.map((group) => (
+            <div key={group.title}>
+              <p className="section-label mb-2 px-1">{group.title}</p>
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((item) => {
+                  const isActive =
+                    (activeView === item.label && mode === 'personal') ||
+                    (item.label === 'Research Lab' && (mode === 'research' || activeView === 'Research Lab'))
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => {
+                        if (item.label === 'Research Lab') {
+                          setMode('research')
+                          setActiveView('Research Lab')
+                        } else {
+                          setMode('personal')
+                          handleNavigateTab(item.label)
+                        }
+                        setMobileNavOpen(false)
+                      }}
+                      className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-all duration-150 ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground font-semibold nav-active-glow'
+                          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`flex size-7 items-center justify-center rounded-lg transition-all ${
                           isActive
-                            ? 'bg-primary text-primary-foreground font-semibold nav-active-glow'
-                            : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`flex size-7 items-center justify-center rounded-lg transition-all ${
-                            isActive
-                              ? 'bg-white/15'
-                              : 'bg-muted/40 group-hover:bg-muted'
-                          }`}>
-                            <item.icon className="size-3.5 shrink-0" />
-                          </div>
-                          <div className="flex flex-col items-start">
-                            <span className="text-[13px] font-medium leading-tight">{item.label}</span>
-                            {item.description && !isActive && (
-                              <span className="text-[10px] text-muted-foreground/70 leading-tight">{item.description}</span>
-                            )}
-                          </div>
+                            ? 'bg-white/15'
+                            : 'bg-muted/40 group-hover:bg-muted'
+                        }`}>
+                          <item.icon className="size-3.5 shrink-0" />
                         </div>
-                        {item.badge && !isActive && (
-                          <span className={`rounded-full px-2 py-px text-[10px] font-bold ${item.badgeClass ?? 'badge-teal'}`}>
-                            {item.badge}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
+                        <div className="flex flex-col items-start">
+                          <span className="text-[13px] font-medium leading-tight">{item.label}</span>
+                          {item.description && !isActive && (
+                            <span className="text-[10px] text-muted-foreground/70 leading-tight">{item.description}</span>
+                          )}
+                        </div>
+                      </div>
+                      {item.badge && !isActive && (
+                        <span className={`rounded-full px-2 py-px text-[10px] font-bold ${item.badgeClass ?? 'badge-teal'}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
-            ))
-          ) : (
-            <div>
-              <p className="section-label mb-2 px-1">Benchmark</p>
-              <button
-                onClick={() => { setMode('research'); setMobileNavOpen(false) }}
-                className="flex w-full items-center gap-3 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground nav-active-glow"
-              >
-                <div className="flex size-7 items-center justify-center rounded-lg bg-white/15">
-                  <FlaskConical className="size-3.5 shrink-0" />
-                </div>
-                <span>PersonaLedger</span>
-              </button>
             </div>
-          )}
+          ))}
 
           {/* Settings group */}
           <div>

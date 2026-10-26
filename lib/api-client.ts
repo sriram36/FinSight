@@ -7,7 +7,13 @@ import {
   AffordabilityResponse,
   Goal,
   CategoryPreference,
-  FinancialChatResponse
+  FinancialChatResponse,
+  SafeToSpendResponse,
+  UserConstraint,
+  UserConstraintCreate,
+  ContextPromptsResponse,
+  ResolveClusterRequest,
+  DefenseEngineMetrics
 } from './types'
 
 const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
@@ -213,6 +219,60 @@ export const api = {
     return request<SpendingProfileResponse>(`/profile?${query.toString()}`)
   },
 
+  // Persistent Constraint Memory & True Safe-to-Spend
+  getSafeToSpend: (rawBalance?: number, userId?: string): Promise<SafeToSpendResponse> => {
+    const activeId = userId || getActiveUserId()
+    let q = `?user_id=${activeId}`
+    if (rawBalance !== undefined && rawBalance !== null) {
+      q += `&raw_balance=${rawBalance}`
+    }
+    return request<SafeToSpendResponse>(`/profile/safe-to-spend${q}`)
+  },
+
+  getConstraints: (userId?: string): Promise<UserConstraint[]> => {
+    const activeId = userId || getActiveUserId()
+    return request<UserConstraint[]>(`/profile/constraints?user_id=${activeId}`)
+  },
+
+  createConstraint: (data: UserConstraintCreate): Promise<UserConstraint> =>
+    request<UserConstraint>('/profile/constraints', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...data,
+        user_id: data.user_id || getActiveUserId(),
+      }),
+    }),
+
+  updateConstraint: (constraintId: string, updates: Partial<UserConstraint>, userId?: string): Promise<UserConstraint> => {
+    const activeId = userId || getActiveUserId()
+    return request<UserConstraint>(`/profile/constraints/${constraintId}?user_id=${activeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+  },
+
+  deleteConstraint: (constraintId: string, userId?: string): Promise<{ deleted: boolean; id: string }> => {
+    const activeId = userId || getActiveUserId()
+    return request<{ deleted: boolean; id: string }>(`/profile/constraints/${constraintId}?user_id=${activeId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // Smart UPI Context Stitcher & IOU Detector
+  getContextPrompts: (userId?: string): Promise<ContextPromptsResponse> => {
+    const activeId = userId || getActiveUserId()
+    return request<ContextPromptsResponse>(`/transactions/context-prompts?user_id=${activeId}`)
+  },
+
+  resolveCluster: (data: ResolveClusterRequest): Promise<any> =>
+    request<any>('/transactions/resolve-cluster', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...data,
+        user_id: data.user_id || getActiveUserId(),
+      }),
+    }),
+
   // Recommendations
   generateRecommendation: (data: {
     user_id?: string
@@ -271,6 +331,9 @@ export const api = {
     upcoming_obligations?: number
     emergency_buffer?: number
     notes?: string
+    horizon_days?: number
+    is_emi?: boolean
+    tenure_months?: number
   }): Promise<AffordabilityResponse> =>
     request<AffordabilityResponse>('/scenarios/affordability', {
       method: 'POST',
@@ -335,6 +398,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
+  getDefenseMetrics: (): Promise<DefenseEngineMetrics> => request<DefenseEngineMetrics>('/research/defense-metrics'),
 
   // Smart Budgeting
   getBudgets: (userId?: string, month?: string): Promise<any[]> => {

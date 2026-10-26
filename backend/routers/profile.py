@@ -1,10 +1,23 @@
-from fastapi import APIRouter, Depends, Query
-from typing import Optional, Dict, Any
+from fastapi import APIRouter, Depends, Query, HTTPException
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta, timezone
 from backend.database import get_db
 from backend.security import get_current_user, verify_user_access
-from backend.schemas.profile import SpendingProfileResponse
-from backend.services.profile_service import calculate_spending_profile
+from backend.schemas.profile import (
+    SpendingProfileResponse,
+    SafeToSpendResponse,
+    UserConstraint,
+    UserConstraintCreate,
+    UserConstraintUpdate,
+)
+from backend.services.profile_service import (
+    calculate_spending_profile,
+    calculate_true_safe_to_spend,
+    list_user_constraints,
+    create_user_constraint,
+    update_user_constraint,
+    delete_user_constraint,
+)
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
@@ -53,3 +66,63 @@ def get_user_spending_profile(
         recent_end=recent_end,
         db=db
     )
+
+
+@router.get("/safe-to-spend", response_model=SafeToSpendResponse)
+def get_true_safe_to_spend(
+    user_id: Optional[str] = Query("default_user"),
+    raw_balance: Optional[float] = Query(None),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
+    return calculate_true_safe_to_spend(target_user_id, db, raw_balance=raw_balance)
+
+
+@router.get("/constraints", response_model=List[UserConstraint])
+def get_constraints(
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
+    return list_user_constraints(target_user_id, db)
+
+
+@router.post("/constraints", response_model=UserConstraint)
+def add_constraint(
+    payload: UserConstraintCreate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, payload.user_id)
+    payload.user_id = target_user_id
+    return create_user_constraint(payload, db)
+
+
+@router.patch("/constraints/{constraint_id}", response_model=UserConstraint)
+def patch_constraint(
+    constraint_id: str,
+    payload: UserConstraintUpdate,
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
+    updated = update_user_constraint(constraint_id, target_user_id, payload.model_dump(exclude_unset=True), db)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Constraint not found")
+    return updated
+
+
+@router.delete("/constraints/{constraint_id}")
+def remove_constraint(
+    constraint_id: str,
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
+    if not delete_user_constraint(constraint_id, target_user_id, db):
+        raise HTTPException(status_code=404, detail="Constraint not found")
+    return {"message": "Constraint deleted", "id": constraint_id}

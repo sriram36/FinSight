@@ -1,7 +1,11 @@
 import json
 import os
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+try:
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+except ImportError:
+    from pydantic import BaseModel as BaseSettings
+    SettingsConfigDict = dict
 
 class Settings(BaseSettings):
     APP_NAME: str = "FinSight AI"

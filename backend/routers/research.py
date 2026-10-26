@@ -6,6 +6,7 @@ from backend.services.research_service import (
     get_temporal_split,
     run_four_way_benchmark,
     run_perturbation_experiment,
+    get_defense_engine_metrics,
 )
 
 router = APIRouter(prefix="/research", tags=["Research Lab"])
@@ -48,6 +49,14 @@ def perturbation_experiment_post(req: PerturbationRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.api_route("/defense-metrics", methods=["GET", "POST"])
+def defense_engine_metrics():
+    try:
+        return get_defense_engine_metrics()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/perturbation")
 def perturbation_experiment_get(

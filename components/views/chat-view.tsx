@@ -15,11 +15,16 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  RotateCcw,
+  Plus,
+  X,
+  WalletCards,
+  Lock,
+  Layers
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
-import { FinancialChatResponse, Transaction } from '@/lib/types'
+import { FinancialChatResponse, Transaction, UserConstraint, SafeToSpendResponse } from '@/lib/types'
 
 interface ChatMessage {
   id: string
@@ -30,12 +35,12 @@ interface ChatMessage {
 }
 
 const SUGGESTED_QUERIES = [
-  'How much did I spend on Dining?',
-  'Can I afford to buy a ₹15,000 laptop?',
-  'Why did my savings drop?',
-  'What are my top expense categories?',
-  'What did I spend on Groceries?',
-  'Can I spend ₹5,000 on Shopping?'
+  'What is my True Safe-to-Spend today?',
+  'Can I afford a ₹15,000 laptop?',
+  'How much have I spent on Dining?',
+  'Who owes me split bill money?',
+  'Check my 30-day cash flow forecast',
+  'What recurring subscriptions do I have?'
 ]
 
 export function ChatView() {
@@ -43,14 +48,37 @@ export function ChatView() {
     {
       id: 'welcome',
       sender: 'assistant',
-      text: "Hello! I am **FinSight AI**, your evidence-grounded financial copilot. Unlike conventional AI chatbots that speculate or fabricate financial figures, every calculation I perform runs deterministically in code against your verified ledger. Every numeric statement is verified by our Claim Verifier before reaching your screen.\n\nAsk me about your category spending, check whether you can afford an upcoming purchase, or investigate what changed in your monthly cash flow.",
+      text: "Hello! I am **FinSight AI**, your constraint-aware conversational CFO. Unlike consumer chat apps that hallucinate figures or encourage irresponsible loans, every computation I perform runs deterministically against your verified ledger and **Active Constraint Memory**.\n\nAsk me about your Safe-to-Spend runway, stress-test upcoming purchases, or inspect who owes you split bill money.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ])
   const [inputValue, setInputValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({})
+  const [constraints, setConstraints] = useState<UserConstraint[]>([])
+  const [safeToSpend, setSafeToSpend] = useState<SafeToSpendResponse | null>(null)
+  const [loadingConstraints, setLoadingConstraints] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const loadSidePanelData = async () => {
+    setLoadingConstraints(true)
+    try {
+      const [cRes, sRes] = await Promise.allSettled([
+        api.getConstraints(),
+        api.getSafeToSpend(),
+      ])
+      if (cRes.status === 'fulfilled') setConstraints(cRes.value)
+      if (sRes.status === 'fulfilled') setSafeToSpend(sRes.value)
+    } catch (err) {
+      console.warn('Failed to load constraints for chat panel', err)
+    } finally {
+      setLoadingConstraints(false)
+    }
+  }
+
+  useEffect(() => {
+    loadSidePanelData()
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -93,6 +121,8 @@ export function ChatView() {
       if (response.cited_transactions && response.cited_transactions.length > 0) {
         setExpandedCitations(prev => ({ ...prev, [assistantMsg.id]: true }))
       }
+      // Refresh side panel in case chat altered or checked constraints
+      loadSidePanelData()
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `assistant_err_${Date.now()}`,
@@ -107,7 +137,7 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto">
       {/* Header Banner */}
       <div className="rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -118,29 +148,28 @@ export function ChatView() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[17px] font-bold tracking-tight">Ask FinSight</h2>
+                  <h2 className="text-[17px] font-bold tracking-tight">AI CFO Co-Pilot</h2>
                   <span className="badge-emerald inline-flex items-center gap-1.5 rounded-full px-2.5 py-px text-[10px] font-bold">
                     <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Verified
+                    Pillar 4: Verified Co-Pilot
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                  Mathematical calculations run in Python, synthesized with{' '}
-                  <code className="px-1 py-px rounded bg-muted text-[10px] font-mono">gpt-5.6-luna</code>
+                  Reads and respects <strong>Active Constraints</strong> · Zero arithmetic hallucination · Cites exact ledger rows
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto text-xs text-muted-foreground border border-border/70 rounded-xl px-3 py-2 bg-muted/30">
-            <ShieldCheck className="size-3.5 text-primary shrink-0" />
-            <span>Claim Verifier: <strong>Strict (±1.0%)</strong></span>
+            <ShieldCheck className="size-3.5 text-emerald-500 shrink-0" />
+            <span>Deterministic Math Guardrail: <strong>Active (±1.0%)</strong></span>
           </div>
         </div>
 
         {/* Suggested Queries Chips */}
         <div className="mt-5 pt-4 border-t border-border/50">
-          <p className="section-label mb-2.5">Suggested Queries</p>
+          <p className="section-label mb-2.5">Quick Intelligence Inquiries</p>
           <div className="flex flex-wrap gap-2">
             {SUGGESTED_QUERIES.map((q, idx) => (
               <button
@@ -157,186 +186,190 @@ export function ChatView() {
         </div>
       </div>
 
-      {/* Messages Stream */}
-      <div className="rounded-2xl border border-border/70 bg-card/60 backdrop-blur-sm flex flex-col min-h-[480px] max-h-[680px] shadow-xs">
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin">
-          {messages.map(msg => (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} animate-slide-up`}
-            >
-              <div className="flex items-center gap-2 mb-2 px-1">
-                {msg.sender === 'assistant' && (
-                  <div className="flex size-5 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-                    <Sparkles className="size-2.5 text-primary" />
-                  </div>
-                )}
-                <span className="text-[11px] font-semibold text-muted-foreground">
-                  {msg.sender === 'user' ? 'You' : 'FinSight Copilot'}
-                </span>
-                <span className="text-[10px] text-muted-foreground/50">{msg.timestamp}</span>
-              </div>
+      {/* Main Grid: Chat Stream + Constraints Memory Side Panel */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,0.9fr)]">
+        {/* Left Column: Chat Conversation */}
+        <div className="flex flex-col h-[640px] rounded-2xl border border-border/70 bg-card shadow-xs overflow-hidden">
+          {/* Scrollable Messages Stream */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {messages.map((msg) => {
+              const isUser = msg.sender === 'user'
+              const citations = msg.data?.cited_transactions || []
+              const hasCitations = citations.length > 0
+              const isExpanded = expandedCitations[msg.id] ?? false
 
-              <div
-                className={`max-w-[92%] sm:max-w-[82%] rounded-2xl p-4 sm:p-5 text-sm leading-relaxed ${
-                  msg.sender === 'user'
-                    ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground font-medium shadow-sm'
-                    : 'bg-card border border-border/70 text-foreground shadow-xs'
-                }`}
-              >
-                <div className="whitespace-pre-wrap">{msg.text}</div>
-
-                {/* Grounding & Verification Provenance Header for Assistant */}
-                {msg.data && (
-                  <div className="mt-4 pt-3.5 border-t border-border/80 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium border bg-muted/60 text-foreground">
-                      <Sparkles className="size-3 text-primary" />
-                      Model: {msg.data.model_used}
+              return (
+                <div key={msg.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                  <div className="flex items-center gap-2 mb-1 px-1">
+                    <span className="text-[11px] font-semibold text-muted-foreground">
+                      {isUser ? 'You' : 'FinSight Co-Pilot'}
                     </span>
-
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium border ${
-                        msg.data.is_verified
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                          : 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                      }`}
-                    >
-                      <ShieldCheck className="size-3" />
-                      {msg.data.is_verified ? 'Math Verified (0 Hallucinations)' : 'Fallback Verification Used'}
-                    </span>
-
-                    <span className="text-[11px] text-muted-foreground ml-auto">
-                      Intent: <strong>{msg.data.intent}</strong>
-                    </span>
-                  </div>
-                )}
-
-                {/* Structured Verified Facts Grid */}
-                {msg.data && msg.data.facts && Object.keys(msg.data.facts).length > 0 && (
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-xl bg-muted/40 border border-border/60 text-xs">
-                    {Object.entries(msg.data.facts).map(([k, v]) => {
-                      if (typeof v === 'object' || v === null || v === undefined) return null
-                      const label = k.replace(/_/g, ' ')
-                      const isMoney = k.includes('amount') || k.includes('spent') || k.includes('balance') || k.includes('impact') || k.includes('buffer') || k.includes('savings')
-                      const displayVal = isMoney && typeof v === 'number'
-                        ? `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : String(v)
-
-                      return (
-                        <div key={k} className="flex flex-col">
-                          <span className="text-[10px] uppercase font-semibold text-muted-foreground">{label}</span>
-                          <span className="font-semibold text-foreground truncate">{displayVal}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Cited Transactions Drawer */}
-                {msg.data && msg.data.cited_transactions && msg.data.cited_transactions.length > 0 && (
-                  <div className="mt-3.5 pt-3 border-t border-border/60">
-                    <button
-                      onClick={() => toggleCitations(msg.id)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-foreground/90 hover:text-primary transition py-1"
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        <Receipt className="size-3.5 text-primary" />
-                        Cited Ledger Transactions ({msg.data.cited_transactions.length} receipts)
+                    <span className="text-[10px] text-muted-foreground/60">{msg.timestamp}</span>
+                    {!isUser && msg.data?.is_verified && (
+                      <span className="badge-emerald inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[9px] font-bold">
+                        <CheckCircle2 className="size-2.5" /> Verified
                       </span>
-                      {expandedCitations[msg.id] ? (
-                        <ChevronUp className="size-3.5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="size-3.5 text-muted-foreground" />
-                      )}
-                    </button>
-
-                    {expandedCitations[msg.id] && (
-                      <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                        {msg.data.cited_transactions.map(tx => (
-                          <div
-                            key={tx.id}
-                            className="flex items-center justify-between p-2 rounded-lg bg-card border border-border text-xs"
-                          >
-                            <div className="flex flex-col min-w-0 pr-2">
-                              <span className="font-medium text-foreground truncate">{tx.description}</span>
-                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                <span>{tx.transaction_date}</span>
-                                <span>•</span>
-                                <span className="rounded bg-muted px-1.5 py-0.2">{tx.category}</span>
-                              </div>
-                            </div>
-                            <div className="font-semibold text-foreground whitespace-nowrap">
-                              ₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
                     )}
                   </div>
-                )}
 
-                {/* Follow-up Prompts */}
-                {msg.data && msg.data.suggested_followups && msg.data.suggested_followups.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] text-muted-foreground font-medium mr-1">Follow up:</span>
-                    {msg.data.suggested_followups.map((fu, fidx) => (
-                      <button
-                        key={fidx}
-                        onClick={() => handleSend(fu)}
-                        disabled={loading}
-                        className="text-xs px-2.5 py-1 rounded-md border border-border bg-muted/60 hover:bg-muted text-foreground transition text-left"
-                      >
-                        {fu}
-                      </button>
-                    ))}
+                  <div
+                    className={`rounded-2xl px-4 py-3 text-xs leading-relaxed max-w-[88%] ${
+                      isUser
+                        ? 'bg-primary text-primary-foreground font-medium rounded-tr-xs shadow-xs'
+                        : 'bg-muted/40 border border-border/80 text-foreground rounded-tl-xs shadow-2xs whitespace-pre-line'
+                    }`}
+                  >
+                    {msg.text}
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
 
-          {loading && (
-            <div className="flex flex-col items-start">
-              <div className="flex items-center gap-2 mb-1.5 px-1">
-                <span className="text-[11px] font-medium text-muted-foreground">FinSight Financial Copilot</span>
-              </div>
-              <div className="rounded-2xl rounded-tl-xs p-4 bg-card border border-border text-sm flex items-center gap-3 text-muted-foreground">
-                <Loader2 className="size-4 animate-spin text-primary" />
-                <span>Running deterministic calculation & verifying claims against ledger...</span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+                  {/* Cited Transactions Drawer */}
+                  {!isUser && hasCitations && (
+                    <div className="mt-2 w-full max-w-[88%] rounded-xl border border-border/60 bg-muted/20 overflow-hidden text-xs">
+                      <button
+                        onClick={() => toggleCitations(msg.id)}
+                        className="flex items-center justify-between w-full px-3 py-2 text-left font-semibold text-[11px] text-muted-foreground hover:bg-muted/40 transition"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Receipt className="size-3 text-primary" />
+                          Cited {citations.length} Grounded Ledger Record{citations.length === 1 ? '' : 's'}
+                        </span>
+                        {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                      </button>
 
-        {/* Input Bar */}
-        <div className="p-4 border-t border-border/60 bg-card/90 rounded-b-2xl">
+                      {isExpanded && (
+                        <div className="px-3 pb-2.5 space-y-1.5 border-t border-border/40 pt-2">
+                          {citations.map((tx) => (
+                            <div key={tx.id} className="flex items-center justify-between rounded-lg bg-card/80 p-2 text-[11px] border border-border/40">
+                              <div className="truncate mr-2">
+                                <span className="font-semibold text-foreground">{tx.description}</span>
+                                <span className="text-muted-foreground text-[10px] ml-1.5">({tx.transaction_date})</span>
+                              </div>
+                              <span className="font-mono font-bold shrink-0">
+                                ₹{tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {loading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 px-1">
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+                <span>FinSight is checking constraints and computing deterministic response...</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Chat Input Bar */}
           <form
-            onSubmit={e => {
+            onSubmit={(e) => {
               e.preventDefault()
               handleSend()
             }}
-            className="flex items-center gap-2.5"
+            className="border-t border-border/70 p-3 bg-muted/20 flex items-center gap-2"
           >
             <input
               type="text"
               value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              placeholder="Ask anything about your ledger..."
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Ask about your budget, test an upcoming purchase, or query constraints..."
               disabled={loading}
-              className="flex-1 rounded-xl border border-border/60 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 disabled:opacity-50 transition-all"
+              className="flex-1 rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-1 focus:ring-primary shadow-xs"
             />
             <Button
               type="submit"
               disabled={loading || !inputValue.trim()}
-              className="rounded-xl px-4 py-2.5 flex items-center gap-1.5 glow-subtle"
+              size="sm"
+              className="rounded-xl px-4 h-9 gap-1.5 font-semibold shrink-0"
             >
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              <span className="hidden sm:inline text-[13px]">Inquire</span>
+              {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+              Send
             </Button>
           </form>
-          <div className="mt-2 text-center text-[11px] text-muted-foreground/50">
-            Financial math is computed deterministically before LLM generation. Zero hallucination on numeric facts.
+        </div>
+
+        {/* Right Column: Active Constraint Memory Side Panel */}
+        <div className="flex flex-col gap-4">
+          <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Lock className="size-4 text-primary" />
+                <h3 className="font-bold text-sm text-foreground">Constraint Memory</h3>
+              </div>
+              <span className="badge-teal rounded-md px-1.5 py-0.5 text-[10px] font-bold">
+                Live Memory
+              </span>
+            </div>
+
+            {/* Quick True Safe-to-Spend Widget */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 mb-4">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                True Safe-to-Spend Today
+              </span>
+              <p className="text-xl font-black font-mono text-foreground mt-0.5">
+                ₹{safeToSpend?.safe_to_spend_today.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}
+                <span className="text-xs font-normal text-muted-foreground"> / day</span>
+              </p>
+              <div className="mt-2 text-[10px] text-muted-foreground flex justify-between border-t border-border/40 pt-1.5">
+                <span>Locked: ₹{safeToSpend?.locked_by_constraints.toLocaleString('en-IN') || '0'}</span>
+                <span>Runway: {safeToSpend?.runway_days_remaining || 30}d</span>
+              </div>
+            </div>
+
+            {/* Constraints List */}
+            <p className="text-[11px] font-bold text-foreground mb-2">Active Inviolable Rules:</p>
+            <div className="space-y-2">
+              {constraints.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No constraints registered yet.</p>
+              ) : (
+                constraints.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`rounded-xl border p-2.5 text-xs transition ${
+                      c.is_active ? 'border-border/80 bg-muted/20' : 'border-border/40 bg-muted/10 opacity-50 line-through'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground truncate">{c.label}</span>
+                      <span className="font-mono font-bold text-foreground shrink-0 ml-2">
+                        ₹{c.amount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
+                      <span>{c.constraint_type}</span>
+                      {c.due_day && <span>Due {c.due_day}th</span>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Natural Language Constraint Injection Suggestions */}
+            <div className="mt-4 pt-3 border-t border-border/60">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                Prompt FinSight To Update Rules:
+              </p>
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => handleSend('Set my emergency floor to ₹6,000')}
+                  className="w-full text-left text-[11px] p-2 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted text-foreground transition truncate"
+                >
+                  💬 "Set my emergency floor to ₹6,000"
+                </button>
+                <button
+                  onClick={() => handleSend('Add a ₹32,000 rent obligation due on the 5th')}
+                  className="w-full text-left text-[11px] p-2 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted text-foreground transition truncate"
+                >
+                  💬 "Add ₹32,000 rent due on the 5th"
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

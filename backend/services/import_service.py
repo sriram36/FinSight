@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
@@ -337,4 +338,193 @@ def confirm_csv_import(
         "duplicate_count": total_duplicate_count,
         "file_name": file_name,
         "created_at": now_iso
+    }
+
+
+AMBIGUOUS_CATEGORIES = {"uncategorized", "transfer", "other", "payment", "p2p"}
+SPLIT_HINTS = ("split", "group", "iou", "settle", "gpay", "upi")
+
+
+def extract_counterparty(description: str) -> str:
+    import re
+    text = (description or "").strip()
+    handle = re.search(r"([a-zA-Z0-9._-]{3,}@[a-zA-Z0-9]+)", text)
+    if handle:
+        return handle.group(1).lower()
+    upi = re.search(r"upi[/:\s]+([a-zA-Z0-9._-]+)", text, re.IGNORECASE)
+    if upi:
+        return upi.group(1).lower()
+    return normalize_merchant_name_lite(text)
+
+
+def normalize_merchant_name_lite(desc: str) -> str:
+    import re
+    clean = re.sub(r"\b(?:tx_|syn_tx_|imp_|rec_|id_|\d{4}-\d{2}-\d{2}|\d+)\b", "", desc or "", flags=re.IGNORECASE)
+    clean = re.sub(r"[\*\#\-\_]+", " ", clean).strip()
+    return clean.lower() if clean else (desc or "unknown").strip().lower()
+
+
+def time_of_day_bucket(transaction_date: str, raw_data: Optional[str] = None) -> str:
+    hour = None
+    minute = 0
+    text = transaction_date or ""
+    if "T" in text and len(text) >= 16:
+        try:
+            hour = int(text[11:13])
+            minute = int(text[14:16])
+        except Exception:
+            hour = None
+    if hour is None and raw_data:
+        try:
+            payload = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+            if isinstance(payload, dict) and payload.get("hour") is not None:
+                hour = int(payload["hour"])
+                minute = int(payload.get("minute") or 0)
+        except Exception:
+            hour = None
+    if hour is None:
+        return "Unspecified"
+    minutes = hour * 60 + minute
+    if 6 * 60 <= minutes < 11 * 60:
+        return "Morning Commute"
+    if 12 * 60 + 30 <= minutes <= 14 * 60 + 30:
+        return "Lunch 12:30-2:30 PM"
+    if minutes >= 22 * 60 + 30 or minutes <= 2 * 60:
+        return "Late-Night 10:30 PM-2:00 AM"
+    return "Daytime"
+
+
+def ticket_size_band(amount: float) -> str:
+    if amount < 150:
+        return "micro (<₹150)"
+    if amount < 500:
+        return "small (₹150-500)"
+    if amount < 2000:
+        return "medium (₹500-2,000)"
+    return "large (>₹2,000)"
+
+
+def cluster_ambiguous_transfers(user_id: str, db) -> List[Dict[str, Any]]:
+    """Cluster uncategorized / P2P transfers for 1-tap UPI context stitcher prompts."""
+    cursor = db.cursor()
+    cursor.execute(
+        """
+        SELECT id, transaction_date, description, amount, category, raw_data
+        FROM transactions
+        WHERE user_id = ? AND (direction = 'spending' OR direction = 'debit' OR direction = 'transfer')
+        ORDER BY transaction_date DESC
+        """,
+        (user_id,),
+    )
+    rows = cursor.fetchall()
+    buckets: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        cat = (r["category"] or "Uncategorized").strip()
+        if cat.lower() not in AMBIGUOUS_CATEGORIES:
+            continue
+        amount = float(r["amount"] or 0.0)
+        handle = extract_counterparty(r["description"])
+        tod = time_of_day_bucket(r["transaction_date"], r["raw_data"])
+        band = ticket_size_band(amount)
+        key = f"{handle}|{tod}|{band}"
+        buckets.setdefault(key, []).append({
+            "id": r["id"],
+            "transaction_date": r["transaction_date"],
+            "description": r["description"],
+            "amount": amount,
+            "category": cat,
+            "counterparty": handle,
+            "time_of_day_bucket": tod,
+            "ticket_size_band": band,
+        })
+
+    prompts = []
+    for key, txs in buckets.items():
+        if len(txs) < 2:
+            continue
+        amounts = [t["amount"] for t in txs]
+        avg = round(sum(amounts) / len(amounts), 2)
+        handle, tod, band = key.split("|")
+        likely_split = avg >= 800 and any(h in (txs[0]["description"] or "").lower() for h in SPLIT_HINTS) or (800 <= avg <= 5000 and "upi" in (txs[0]["description"] or "").lower() and len(txs) <= 4)
+        if "lunch" in tod.lower() or (90 <= avg <= 250 and "lunch" in tod.lower()):
+            suggestion = f"You paid {handle} {len(txs)} times during {tod} averaging ₹{avg:,.0f}. Categorize all as Daily Lunch?"
+            suggested_category = "Dining"
+        elif "late-night" in tod.lower():
+            suggestion = f"{len(txs)} late-night transfers to {handle} averaging ₹{avg:,.0f}. Tag as Late-Night Food?"
+            suggested_category = "Dining"
+        elif likely_split or avg >= 1500:
+            suggestion = f"Was the cluster of {len(txs)} payments to {handle} (avg ₹{avg:,.0f}) a group split bill / IOU?"
+            suggested_category = "Transfer"
+        else:
+            suggestion = f"{len(txs)} similar P2P transfers to {handle} ({tod}, {band}). Categorize together?"
+            suggested_category = "Uncategorized"
+        cluster_id = f"clu_{uuid.uuid4().hex[:10]}"
+        prompts.append({
+            "cluster_id": cluster_id,
+            "cluster_key": key,
+            "counterparty": handle,
+            "time_of_day_bucket": tod,
+            "ticket_size_band": band,
+            "transaction_count": len(txs),
+            "transaction_ids": [t["id"] for t in txs],
+            "exact_sum": round(sum(amounts), 2),
+            "average_amount": avg,
+            "suggested_category": suggested_category,
+            "prompt": suggestion,
+            "likely_split_bill": bool(likely_split or (avg >= 1500 and tod != "Lunch 12:30-2:30 PM")),
+            "sample_descriptions": list({t["description"] for t in txs})[:3],
+        })
+    prompts.sort(key=lambda x: x["transaction_count"], reverse=True)
+    return prompts[:12]
+
+
+def resolve_transaction_cluster(
+    user_id: str,
+    cluster_key: str,
+    category: str,
+    db,
+    register_iou: bool = False,
+    iou_label: Optional[str] = None,
+) -> Dict[str, Any]:
+    clusters = cluster_ambiguous_transfers(user_id, db)
+    match = next((c for c in clusters if c["cluster_key"] == cluster_key), None)
+    if not match:
+        # Fallback: accept explicit transaction_ids packed into cluster_key as csv prefixed ids
+        return {"updated_count": 0, "cluster_key": cluster_key, "iou_registered": False}
+
+    cursor = db.cursor()
+    updated = 0
+    for tx_id in match["transaction_ids"]:
+        cursor.execute(
+            """
+            UPDATE transactions
+            SET category = ?, category_source = 'upi_stitcher'
+            WHERE id = ? AND user_id = ?
+            """,
+            (category, tx_id, user_id),
+        )
+        updated += cursor.rowcount
+    iou_id = None
+    if register_iou:
+        from backend.services.profile_service import create_user_constraint
+        from backend.schemas.profile import UserConstraintCreate
+        constraint = create_user_constraint(
+            UserConstraintCreate(
+                user_id=user_id,
+                constraint_type="PENDING_IOU",
+                label=iou_label or f"Split bill owed by {match['counterparty']}",
+                amount=match["exact_sum"],
+                metadata={"cluster_key": cluster_key, "transaction_ids": match["transaction_ids"]},
+            ),
+            db,
+        )
+        iou_id = constraint.id
+    db.commit()
+    return {
+        "updated_count": updated,
+        "cluster_key": cluster_key,
+        "category": category,
+        "transaction_ids": match["transaction_ids"],
+        "iou_registered": bool(iou_id),
+        "iou_constraint_id": iou_id,
     }

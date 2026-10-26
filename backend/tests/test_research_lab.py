@@ -85,3 +85,15 @@ def test_perturbation_experiment():
     assert resp.status_code == 200
     data = resp.json()
     assert data["evaluations"]["Config_C"]["grounded_verification"] is True
+
+def test_defense_engine_metrics():
+    res = client.get("/research/defense-metrics")
+    assert res.status_code == 200
+    data = res.json()
+    assert "claim_verification_faithfulness_rate" in data
+    assert data["claim_verification_faithfulness_rate"] == 1.0
+    assert "constraint_satisfaction_accuracy" in data
+    assert data["constraint_satisfaction_accuracy"] == 1.0
+    assert "upi_clustering_coverage" in data
+    assert data["upi_clustering_coverage"] >= 0.90
+

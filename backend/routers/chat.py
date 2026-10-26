@@ -22,6 +22,8 @@ class ChatQueryResponse(BaseModel):
     cited_transactions: List[Dict[str, Any]] = Field(default_factory=list)
     suggested_followups: List[str] = Field(default_factory=list)
     created_at: str
+    evidence_bundle: Optional[Dict[str, Any]] = None
+    active_constraints: List[Dict[str, Any]] = Field(default_factory=list)
 
 @router.post("/query", response_model=ChatQueryResponse)
 def query_financial_copilot(

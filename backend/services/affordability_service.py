@@ -1,6 +1,10 @@
-from typing import List
+from datetime import date, datetime, timedelta
+from typing import List, Dict, Any, Optional
 from backend.schemas.scenario import AffordabilityRequest, AffordabilityResponse, AffordabilityGoalImpact
 from backend.services.goal_service import calculate_goal_metrics
+from backend.services.profile_service import list_user_constraints
+from backend.services.forecast_service import calculate_cash_flow_forecast
+from backend.services.verifier_service import bind_evidence_bundle
 
 def evaluate_affordability(req: AffordabilityRequest, db) -> AffordabilityResponse:
     if req.available_balance is None:
@@ -86,6 +90,35 @@ def evaluate_affordability(req: AffordabilityRequest, db) -> AffordabilityRespon
         for gi in goal_impacts:
             gi.is_delayed = True
 
+    stress = run_cashflow_stress_test(
+        user_id=req.user_id,
+        purchase_amount=req.purchase_amount,
+        available_balance=req.available_balance,
+        purchase_date=req.purchase_date,
+        horizon_days=req.horizon_days or 30,
+        is_emi=bool(req.is_emi),
+        tenure_months=req.tenure_months,
+        hard_floor=buffer if req.emergency_buffer is not None else None,
+        db=db,
+    )
+    assumptions.extend(stress.get("assumptions", []))
+
+    evidence = bind_evidence_bundle(
+        transaction_ids=[],
+        exact_sum=req.purchase_amount,
+        baseline_sum=req.available_balance,
+        extra={
+            "purchase_amount": req.purchase_amount,
+            "available_balance": req.available_balance,
+            "post_purchase_remainder": post_purchase,
+            "survival_probability": stress["survival_probability"],
+        },
+        claim_text=(
+            f"A purchase of ₹{req.purchase_amount:,.2f} against ₹{req.available_balance:,.2f} "
+            f"leaves ₹{post_purchase:,.2f} with survival probability {stress['survival_probability']}%."
+        ),
+    )
+
     return AffordabilityResponse(
         purchase_amount=req.purchase_amount,
         available_balance=req.available_balance,
@@ -98,5 +131,137 @@ def evaluate_affordability(req: AffordabilityRequest, db) -> AffordabilityRespon
         summary=summary,
         missing_inputs=[],
         assumptions=assumptions,
-        goal_impacts=goal_impacts
+        goal_impacts=goal_impacts,
+        survival_probability=stress["survival_probability"],
+        constraint_violations=stress["constraint_violations"],
+        counterfactual_alternatives=stress["counterfactual_alternatives"],
+        runway_timeline=stress["runway_timeline"],
+        evidence_bundle=evidence,
     )
+
+
+def run_cashflow_stress_test(
+    user_id: str,
+    purchase_amount: float,
+    available_balance: float,
+    purchase_date: Optional[str],
+    horizon_days: int,
+    is_emi: bool,
+    tenure_months: Optional[int],
+    hard_floor: Optional[float],
+    db,
+) -> Dict[str, Any]:
+    horizon = max(7, min(90, int(horizon_days or 30)))
+    today = date.today()
+    try:
+        buy_on = datetime.strptime((purchase_date or today.isoformat())[:10], "%Y-%m-%d").date()
+    except Exception:
+        buy_on = today
+
+    constraints = list_user_constraints(user_id, db, active_only=True)
+    floor_amt = hard_floor
+    if floor_amt is None:
+        floors = [c.amount for c in constraints if c.constraint_type == "HARD_FLOOR"]
+        floor_amt = floors[0] if floors else 0.0
+
+    forecast = calculate_cash_flow_forecast(user_id, horizon, available_balance, db)
+    daily_burn = float(forecast.get("daily_burn_rate") or 0.0)
+    events_by_day: Dict[str, float] = {}
+    for ev in forecast.get("events") or []:
+        dkey = str(ev.get("date") or "")[:10]
+        amt = float(ev.get("amount") or 0.0)
+        events_by_day[dkey] = events_by_day.get(dkey, 0.0) + amt
+
+    for c in constraints:
+        if c.constraint_type == "FIXED_OBLIGATION" and c.due_day:
+            due = date(today.year, today.month, min(c.due_day, 28))
+            if due < today:
+                if today.month == 12:
+                    due = date(today.year + 1, 1, min(c.due_day, 28))
+                else:
+                    due = date(today.year, today.month + 1, min(c.due_day, 28))
+            dkey = due.isoformat()
+            events_by_day[dkey] = events_by_day.get(dkey, 0.0) - c.amount
+
+    emi_daily = 0.0
+    lump = purchase_amount
+    if is_emi and tenure_months:
+        lump = round(purchase_amount / max(1, tenure_months), 2)
+        emi_daily = 0.0
+
+    balance = float(available_balance)
+    violations: List[Dict[str, Any]] = []
+    timeline: List[Dict[str, Any]] = []
+    days_ok = 0
+    first_breach_day = None
+
+    for i in range(horizon):
+        day = today + timedelta(days=i)
+        if day == buy_on:
+            balance -= lump
+        balance -= daily_burn
+        dkey = day.isoformat()
+        if dkey in events_by_day:
+            balance += events_by_day[dkey]
+        below = floor_amt > 0 and balance < floor_amt
+        if below:
+            if first_breach_day is None:
+                first_breach_day = i + 1
+                label = next((c.label for c in constraints if c.constraint_type == "HARD_FLOOR"), "Hard Floor")
+                violations.append({
+                    "constraint_type": "HARD_FLOOR",
+                    "label": label,
+                    "amount": floor_amt,
+                    "breach_day": i + 1,
+                    "breach_date": dkey,
+                    "projected_balance": round(balance, 2),
+                    "message": f"Breaches ₹{floor_amt:,.0f} {label} on Day {i + 1} ({dkey}).",
+                })
+        else:
+            days_ok += 1
+        if i % max(1, horizon // 10) == 0 or below or day == buy_on:
+            timeline.append({
+                "day": i,
+                "date": dkey,
+                "projected_balance": round(balance, 2),
+                "below_floor": below,
+            })
+
+    survival = round((days_ok / horizon) * 100.0, 1)
+    alternatives: List[Dict[str, Any]] = []
+    if first_breach_day is not None:
+        delay_days = first_breach_day
+        alternatives.append({
+            "action": "delay_purchase",
+            "label": f"Delay purchase by {delay_days} days",
+            "detail": f"Waiting {delay_days} days avoids the first hard-floor breach on the current velocity.",
+        })
+        cut_needed = round(max(0.0, (floor_amt - (available_balance - purchase_amount)) / max(1, horizon)), 2)
+        if cut_needed > 0:
+            alternatives.append({
+                "action": "cut_velocity",
+                "label": f"Cut evening food velocity by ₹{cut_needed:,.0f}/day for {min(21, horizon)} days",
+                "detail": "Lower discretionary daily burn until the next inflow restores the floor.",
+            })
+        alternatives.append({
+            "action": "emi_split",
+            "label": "Split into 3-month no-cost EMI",
+            "detail": f"₹{round(purchase_amount / 3.0, 2):,.2f}/month instead of a single ₹{purchase_amount:,.2f} debit.",
+        })
+    else:
+        alternatives.append({
+            "action": "proceed",
+            "label": "Purchase stays above every active constraint across the horizon",
+            "detail": f"Survival probability {survival}% over {horizon} days.",
+        })
+
+    return {
+        "survival_probability": survival,
+        "constraint_violations": violations,
+        "counterfactual_alternatives": alternatives,
+        "runway_timeline": timeline,
+        "assumptions": [
+            f"Stress-tested {horizon} days using historical daily spend velocity of ₹{daily_burn:,.2f}/day.",
+            f"Active constraint floor used: ₹{floor_amt:,.2f}.",
+        ],
+    }

@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 class AffordabilityRequest(BaseModel):
@@ -9,6 +9,9 @@ class AffordabilityRequest(BaseModel):
     upcoming_obligations: Optional[float] = None
     emergency_buffer: Optional[float] = None
     notes: Optional[str] = None
+    horizon_days: int = Field(default=30, ge=7, le=90)
+    tenure_months: Optional[int] = Field(default=None, ge=1, le=36)
+    is_emi: bool = False
 
 class AffordabilityGoalImpact(BaseModel):
     goal_id: str
@@ -29,3 +32,8 @@ class AffordabilityResponse(BaseModel):
     missing_inputs: List[str] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
     goal_impacts: List[AffordabilityGoalImpact] = Field(default_factory=list)
+    survival_probability: Optional[float] = None
+    constraint_violations: List[Dict[str, Any]] = Field(default_factory=list)
+    counterfactual_alternatives: List[Dict[str, Any]] = Field(default_factory=list)
+    runway_timeline: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_bundle: Optional[Dict[str, Any]] = None

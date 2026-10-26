@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from backend.schemas.verifier import VerificationResult
 
 CURRENCY_EVIDENCE_KEYS = {
@@ -9,10 +9,13 @@ CURRENCY_EVIDENCE_KEYS = {
     "emergency_buffer", "emergency_fund_target", "total_income", "total_spending",
     "net_savings", "target_amount", "current_amount", "remaining_amount", "latest_amount",
     "total_budget", "remaining", "upcoming_total", "flagged_amount", "projected_spend",
-    "projected_income", "projected_outflow", "projected_net", "total_upcoming"
+    "projected_income", "projected_outflow", "projected_net", "total_upcoming",
+    "exact_sum", "baseline_sum", "safe_to_spend_today", "raw_balance",
+    "locked_by_constraints", "uncommitted_before", "post_purchase_remainder"
 }
 PERCENTAGE_EVIDENCE_KEYS = {
-    "percentage_deviation", "target_reduction", "threshold", "delta_percentage", "profile_delta", "savings_rate_pct"
+    "percentage_deviation", "target_reduction", "threshold", "delta_percentage", "profile_delta",
+    "savings_rate_pct", "delta_pct", "survival_probability", "price_creep_pct"
 }
 COUNT_EVIDENCE_KEYS = {
     "transaction_count", "period_days", "baseline_days", "recent_days"
@@ -138,3 +141,45 @@ def verify_recommendation_claims(
         tolerance_used=tolerance,
         notes=notes
     )
+
+
+def bind_evidence_bundle(
+    transaction_ids: List[str],
+    exact_sum: float,
+    baseline_sum: float = 0.0,
+    extra: Optional[Dict[str, Any]] = None,
+    claim_text: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Attach verifier-backed evidence to insight cards."""
+    delta_pct = 0.0
+    if baseline_sum > 0:
+        delta_pct = round(((exact_sum - baseline_sum) / baseline_sum) * 100.0, 2)
+    elif exact_sum > 0:
+        delta_pct = 100.0
+    evidence = {
+        "exact_sum": round(exact_sum, 2),
+        "baseline_sum": round(baseline_sum, 2),
+        "delta_pct": delta_pct,
+        "transaction_count": len(transaction_ids),
+        "total_spent": round(exact_sum, 2),
+    }
+    if extra:
+        for k, v in extra.items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                evidence[k] = v
+    text = claim_text or (
+        f"Cited {len(transaction_ids)} transactions totaling ₹{exact_sum:,.2f} "
+        f"versus a baseline of ₹{baseline_sum:,.2f} ({delta_pct}%)."
+    )
+    verification = verify_recommendation_claims(text, evidence, tolerance=0.01)
+    bundle = {
+        "transaction_ids": transaction_ids,
+        "exact_sum": round(exact_sum, 2),
+        "baseline_sum": round(baseline_sum, 2),
+        "delta_pct": delta_pct,
+        "verification_status": "VERIFIED" if verification.is_verified else "UNVERIFIED",
+        "verifier_notes": verification.notes,
+    }
+    if extra:
+        bundle.update(extra)
+    return bundle

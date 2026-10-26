@@ -9,5 +9,12 @@ def health_check():
         "status": "ok",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "environment": settings.APP_ENV
+        "environment": settings.APP_ENV,
+        "headline_metric": "safe_to_spend_today",
+        "headline_fields": [
+            "safe_to_spend_today",
+            "raw_balance",
+            "locked_by_constraints",
+            "runway_days_remaining",
+        ],
     }

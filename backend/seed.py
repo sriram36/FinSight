@@ -114,7 +114,7 @@ def seed_demo_data(conn):
         (2, "Whole Foods Market Dinner Provisions", 3250.0),
     ]
     for days_ago, desc, amt in groceries_data:
-        sample_txs.append(((today - timedelta(days=days_ago)).isoformat(), desc, amt, "spending", "Groceries"))
+        sample_txs.append(((today - timedelta(days=days_ago)).isoformat() + "T10:30:00", desc, amt, "spending", "Groceries"))
 
     # Dining & Coffee (Past 60 days)
     dining_data = [
@@ -134,7 +134,45 @@ def seed_demo_data(conn):
         (1, "Artisan Espresso Lounge", 450.0),
     ]
     for days_ago, desc, amt in dining_data:
-        sample_txs.append(((today - timedelta(days=days_ago)).isoformat(), desc, amt, "spending", "Dining"))
+        sample_txs.append(((today - timedelta(days=days_ago)).isoformat() + "T12:45:00", desc, amt, "spending", "Dining"))
+
+    # Late-Night UPI Micro-Bleeds (Between 22:30 and 01:45)
+    late_night_data = [
+        (55, "Swiggy Late-Night Biryani Delivery", 480.0, "23:40:00"),
+        (49, "Zomato Midnight Craving Wings", 520.0, "00:15:00"),
+        (42, "Zepto Quick Late-Night Snacks", 340.0, "23:10:00"),
+        (35, "Swiggy Midnight Dessert Delivery", 410.0, "01:20:00"),
+        (28, "Zomato Late-Night Roll & Shake", 460.0, "23:55:00"),
+        (20, "Swiggy Night Owl Gourmet Burger", 580.0, "00:45:00"),
+        (12, "Zepto Midnight Munchies Pack", 390.0, "23:30:00"),
+        (3, "Zomato Midnight Pizza Slice", 510.0, "01:10:00"),
+    ]
+    for days_ago, desc, amt, t_str in late_night_data:
+        sample_txs.append(((today - timedelta(days=days_ago)).isoformat() + "T" + t_str, desc, amt, "spending", "Dining"))
+
+    # Uncategorized P2P Lunch / Mess Transfers (Smart UPI Stitcher Demo)
+    # Paid to Ramesh Mess during lunch hours (13:00) averaging ₹110
+    mess_days = [58, 53, 48, 44, 40, 36, 30, 25, 22, 17, 13, 8, 5, 2]
+    for d in mess_days:
+        sample_txs.append((
+            (today - timedelta(days=d)).isoformat() + "T13:15:00",
+            "UPI/9845012345/Ramesh Mess Daily Lunch",
+            110.0,
+            "spending",
+            "Uncategorized"
+        ))
+
+    # Split-Bill Group Dinner (IOU Detector Demo)
+    sample_txs.append((
+        (today - timedelta(days=7)).isoformat() + "T20:45:00",
+        "The Smokehouse Grill - Team Group Dinner (Split Bill)",
+        4800.0,
+        "spending",
+        "Dining"
+    ))
+
+    # Subscription Price Creep (Phantom Drain Demo: Netflix jumped from ₹649 to ₹799)
+    sample_txs.append(((today - timedelta(days=5)).isoformat() + "T09:00:00", "Netflix Premium UltraHD Subscription", 799.0, "spending", "Subscriptions"))
 
     # Transit
     transit_data = [
@@ -235,5 +273,48 @@ def seed_demo_data(conn):
             rid, DEMO_USER_ID, config, cat, action, reason,
             ev_json, impact, assumptions, is_ver, notes, created_at_iso
         ))
+
+    # 5. Seed Persistent User Constraints
+    sample_constraints = [
+        ("cst_seed_floor_01", DEMO_USER_ID, "HARD_FLOOR", "Emergency Liquidity Floor", 5000.0, None, 1, json.dumps({"description": "Never dip below ₹5,000 liquid buffer"})),
+        ("cst_seed_rent_01", DEMO_USER_ID, "FIXED_OBLIGATION", "Greenfield Realty Rent Due", 32000.0, 5, 1, json.dumps({"due_day": 5, "category": "Housing"})),
+        ("cst_seed_cap_01", DEMO_USER_ID, "BEHAVIORAL_CAP", "Late-Night Delivery Cap", 2000.0, None, 1, json.dumps({"target": "Dining", "max_weekly_orders": 3})),
+        ("cst_seed_iou_01", DEMO_USER_ID, "PENDING_IOU", "Smokehouse Grill Split Owed by Rahul", 2400.0, None, 1, json.dumps({"source": "split_bill", "counterparty": "Rahul"})),
+    ]
+
+    for cid, uid, ctype, label, amt, due_day, is_act, meta_str in sample_constraints:
+        cursor.execute("""
+        INSERT INTO user_constraints (
+            id, user_id, constraint_type, label, amount, due_day, is_active, metadata_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO NOTHING;
+        """, (cid, uid, ctype, label, amt, due_day, is_act, meta_str, created_at_iso, created_at_iso))
+
+    # 6. Seed Recurring Items & Phantom Drain
+    sample_recurring = [
+        (
+            "rec_sub_netflix_01", DEMO_USER_ID, "Netflix Premium UltraHD", "Subscriptions", 799.0, "monthly",
+            (today + timedelta(days=25)).isoformat(), today.isoformat(), "active", 1, 0.95,
+            "Price increased by ₹150.00 (from ₹649.00) — Phantom Drain flagged"
+        ),
+        (
+            "rec_sub_spotify_01", DEMO_USER_ID, "Spotify Family HiFi", "Subscriptions", 299.0, "monthly",
+            (today + timedelta(days=15)).isoformat(), (today - timedelta(days=15)).isoformat(), "active", 1, 0.95,
+            None
+        ),
+        (
+            "rec_sub_gym_01", DEMO_USER_ID, "Equinox Fitness Club", "Subscriptions", 4200.0, "monthly",
+            (today + timedelta(days=20)).isoformat(), (today - timedelta(days=10)).isoformat(), "active", 1, 0.90,
+            None
+        ),
+    ]
+
+    for rid, uid, merch, cat, amt, freq, next_d, last_d, stat, conf_b, conf_score, notes in sample_recurring:
+        cursor.execute("""
+        INSERT INTO recurring_items (
+            id, user_id, merchant, category, amount, frequency, next_due_date, last_seen_date, status, is_confirmed, confidence, notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO NOTHING;
+        """, (rid, uid, merch, cat, amt, freq, next_d, last_d, stat, conf_b, conf_score, notes, created_at_iso))
 
     conn.commit()

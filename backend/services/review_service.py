@@ -143,5 +143,103 @@ def generate_monthly_review(user_id: str, month_str: Optional[str], db) -> Dict[
         "anomalies_count": len(month_anomalies),
         "anomalies": month_anomalies,
         "narrative": narrative,
-        "transaction_count": len(curr_txs)
+        "transaction_count": len(curr_txs),
+        "spending_attribution": _spending_change_attribution(curr_txs, prev_txs),
+        "late_night_velocity": _late_night_velocity(curr_txs, prev_txs),
+    }
+
+
+def _parse_hour(tx_date: str) -> Optional[int]:
+    text = str(tx_date or "")
+    if "T" in text and len(text) >= 13:
+        try:
+            return int(text[11:13])
+        except Exception:
+            return None
+    return None
+
+
+def _spending_change_attribution(curr_txs, prev_txs) -> Dict[str, Any]:
+    from backend.services.verifier_service import bind_evidence_bundle
+
+    def _spend(rows):
+        return [r for r in rows if r["direction"] == "spending"]
+
+    curr = _spend(curr_txs)
+    prev = _spend(prev_txs)
+    by_cat_curr: Dict[str, List] = defaultdict(list)
+    by_cat_prev: Dict[str, List] = defaultdict(list)
+    for t in curr:
+        by_cat_curr[t["category"]].append(t)
+    for t in prev:
+        by_cat_prev[t["category"]].append(t)
+
+    cards = []
+    cats = set(by_cat_curr) | set(by_cat_prev)
+    for cat in cats:
+        c_rows = by_cat_curr.get(cat, [])
+        p_rows = by_cat_prev.get(cat, [])
+        c_sum = sum(float(t["amount"]) for t in c_rows)
+        p_sum = sum(float(t["amount"]) for t in p_rows)
+        if abs(c_sum - p_sum) < 1:
+            continue
+        c_freq = len(c_rows)
+        p_freq = len(p_rows)
+        c_ticket = c_sum / c_freq if c_freq else 0.0
+        p_ticket = p_sum / p_freq if p_freq else 0.0
+        freq_effect = (c_freq - p_freq) * (p_ticket or c_ticket)
+        ticket_effect = (c_ticket - p_ticket) * (p_freq or c_freq)
+        driver = "frequency_drift" if abs(freq_effect) >= abs(ticket_effect) else "ticket_size_inflation"
+        ids = [t["id"] for t in c_rows]
+        bundle = bind_evidence_bundle(ids, c_sum, p_sum, extra={"recent_amount": round(c_sum, 2), "baseline_amount": round(p_sum, 2)})
+        cards.append({
+            "category": cat,
+            "driver": driver,
+            "frequency_current": c_freq,
+            "frequency_baseline": p_freq,
+            "avg_ticket_current": round(c_ticket, 2),
+            "avg_ticket_baseline": round(p_ticket, 2),
+            "frequency_effect": round(freq_effect, 2),
+            "ticket_size_effect": round(ticket_effect, 2),
+            "current_spend": round(c_sum, 2),
+            "previous_spend": round(p_sum, 2),
+            "evidence_bundle": bundle,
+        })
+    cards.sort(key=lambda x: abs(x["current_spend"] - x["previous_spend"]), reverse=True)
+    return {"cards": cards[:8], "card_count": len(cards)}
+
+
+def _late_night_velocity(curr_txs, prev_txs) -> Dict[str, Any]:
+    from backend.services.verifier_service import bind_evidence_bundle
+
+    def late(rows):
+        out = []
+        for t in rows:
+            if t["direction"] != "spending":
+                continue
+            hour = _parse_hour(t["transaction_date"])
+            if hour is not None and (hour >= 22 or hour < 2):
+                out.append(t)
+        return out
+
+    curr_late = late(curr_txs)
+    prev_late = late(prev_txs)
+    c_sum = sum(float(t["amount"]) for t in curr_late)
+    p_sum = sum(float(t["amount"]) for t in prev_late)
+    bundle = bind_evidence_bundle(
+        [t["id"] for t in curr_late],
+        c_sum,
+        p_sum,
+        extra={"recent_amount": round(c_sum, 2), "baseline_amount": round(p_sum, 2)},
+    )
+    return {
+        "current_count": len(curr_late),
+        "baseline_count": len(prev_late),
+        "current_spend": round(c_sum, 2),
+        "baseline_spend": round(p_sum, 2),
+        "evidence_bundle": bundle,
+        "headline": (
+            f"{len(curr_late)} late-night spends totaling ₹{c_sum:,.2f} "
+            f"vs {len(prev_late)} totaling ₹{p_sum:,.2f} in the prior period."
+        ),
     }

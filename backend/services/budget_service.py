@@ -189,6 +189,12 @@ def get_budget_summary(user_id: str, month: Optional[str], db) -> Dict[str, Any]
         "items": budgets
     }
 
+def calculate_true_safe_to_spend(user_id: str, db, raw_balance: Optional[float] = None):
+    """Constraint-aware safe-to-spend headline used by Command Center."""
+    from backend.services.profile_service import calculate_true_safe_to_spend as _calc
+    return _calc(user_id, db, raw_balance=raw_balance)
+
+
 def get_monthly_budget_summary(user_id: str, month: Optional[str], db) -> Dict[str, Any]:
     summary = get_budget_summary(user_id, month, db)
     return {

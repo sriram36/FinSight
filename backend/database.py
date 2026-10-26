@@ -326,6 +326,23 @@ def init_db(db_target: Optional[str] = None, auto_seed: bool = True):
     );
     """)
 
+    # Persistent user constraints (hard floors, fixed obligations, behavioral caps, IOUs)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_constraints (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        constraint_type TEXT NOT NULL,
+        label TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0.0,
+        due_day INTEGER,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    """)
+
     # Default demo user (standard ANSI SQL ON CONFLICT compatible with Postgres and SQLite)
     cursor.execute("""
     INSERT INTO users (id, name, email, created_at)

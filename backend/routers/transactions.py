@@ -11,7 +11,18 @@ from backend.schemas.transaction import (
     STANDARD_CATEGORIES
 )
 
+from pydantic import BaseModel, Field
+from backend.services.import_service import cluster_ambiguous_transfers, resolve_transaction_cluster
+
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+
+
+class ResolveClusterRequest(BaseModel):
+    user_id: Optional[str] = "default_user"
+    cluster_key: str
+    category: str
+    register_iou: bool = False
+    iou_label: Optional[str] = None
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
 def create_transaction(
@@ -176,6 +187,38 @@ def delete_transaction(
     cursor.execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (tx_id, target_user_id))
     db.commit()
     return {"message": "Transaction deleted successfully.", "id": tx_id}
+
+@router.get("/context-prompts")
+def get_upi_context_prompts(
+    user_id: Optional[str] = Query("default_user"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, user_id)
+    clusters = cluster_ambiguous_transfers(target_user_id, db)
+    return {
+        "user_id": target_user_id,
+        "cluster_count": len(clusters),
+        "clusters": clusters,
+    }
+
+
+@router.post("/resolve-cluster")
+def resolve_upi_cluster(
+    req: ResolveClusterRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    target_user_id = verify_user_access(current_user, req.user_id)
+    return resolve_transaction_cluster(
+        user_id=target_user_id,
+        cluster_key=req.cluster_key,
+        category=req.category,
+        db=db,
+        register_iou=req.register_iou,
+        iou_label=req.iou_label,
+    )
+
 
 @router.get("/cashflow")
 def get_cashflow_summary(

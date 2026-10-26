@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/logo.svg" alt="FinSight AI Logo" width="96" height="96" />
   <h1>FinSight AI</h1>
-  <p>Evidence-grounded personal finance decision support and reproducible evaluation platform.</p>
+  <p>Unbiased Financial Defense & Pre-Decision Intelligence Co-Pilot with Reproducible Evaluation Platform.</p>
 
   <p>
     <a href="https://finsight-wine-tau.vercel.app/">Production Web Client</a> &bull;
@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Next.js-16.4.3-111111?logo=next.js" alt="Next.js" />
     <img src="https://img.shields.io/badge/FastAPI-0.110+-008080?logo=fastapi&logoColor=white" alt="FastAPI" />
     <img src="https://img.shields.io/badge/Storage-PostgreSQL%20%7C%20SQLite3-2d5a88?logo=postgresql&logoColor=white" alt="Storage" />
-    <img src="https://img.shields.io/badge/Tests-60%20Passing-2e7d32" alt="Pytest Coverage" />
+    <img src="https://img.shields.io/badge/Tests-Passing-2e7d32" alt="Pytest Coverage" />
     <img src="https://img.shields.io/badge/License-MIT-444444" alt="License" />
   </p>
 </div>
@@ -33,32 +33,40 @@ Detailed architectural, mathematical, and operational specifications are maintai
 
 ---
 
-## Overview & Core Problem
+## Overview & Core Philosophy Shift
 
-Large language models generate compelling narrative prose but exhibit high failure rates when performing arithmetic aggregation, calculating runway budgets, or citing accurate monetary amounts. In personal finance, ungrounded recommendations introduce critical risks—such as proposing spending cuts to non-discretionary contractual commitments (e.g., medical insurance or lease agreements) or inventing phantom savings.
+Traditional personal finance tools act as passive post-mortem recorders—merely showing charts of where money was already lost. Furthermore, generic LLM-based assistants hallucinate numbers, miscalculate balances, and suggest ungrounded spending cuts to non-discretionary commitments.
 
-FinSight AI resolves this by enforcing a strict boundary between deterministic financial mathematics and language generation:
-1. **Mathematical Isolation:** All aggregation, period normalization, and daily pacing calculations occur deterministically in Python. LLMs never compute arithmetic totals.
-2. **Strict Claim Verification:** Every recommendation generated under System C must cite itemized source transaction identifiers. An automated verifier extracts every numeric token in the generated text and cross-examines it against empirical receipts within a 1.5% rounding margin.
-3. **Protected Category Invariants:** Essential categories designated by the user (e.g., Healthcare, Housing) are structurally shielded. Neither the recommendation pipeline nor the purchase simulator may propose reductions to protected essentials.
+**FinSight AI transforms personal finance into an Unbiased Financial Defense & Pre-Decision Co-Pilot** structured around **4 Core Closed-Loop Product Pillars + The Research Lab**:
+1. **Mathematical Isolation & Invariant Protection:** Arithmetic, runway budgets, and cash-flow stress tests run deterministically in Python. Protected categories and user constraints are inviolable contractual rules.
+2. **Strict Claim & Evidence Verification:** Every AI-generated insight must bind to empirical transaction IDs with numeric verification (within 1.0% rounding tolerance).
+3. **Pre-Purchase Counterfactual Sandbox:** Validates large purchases and EMI stress tests before money leaves the bank.
+4. **Academic Research Reproducibility:** Preserves an end-to-end benchmark lab with temporal holdouts and perturbation studies.
 
 ---
 
-## Architectural Topology
+## Architectural Topology (4 Core Pillars + Research Lab)
 
 ```mermaid
 graph TD
     subgraph ClientLayer ["Client Layer (Next.js 16 / React 19)"]
-        UI_Shell[Application Shell]
-        UI_Views[Overview, Transactions, Profile, Recommendations, Simulator, Goals, Research Lab]
+        UI_Shell[Unified 5-Pillar Shell - finsight-shell.tsx]
+        P1[Pillar 1: Command Center - True Safe-to-Spend & Constraints]
+        P2[Pillar 2: Decision Simulator - Counterfactual EMI & Stress-Tester]
+        P3[Pillar 3: Behavioral Autopsy - Delta Engine & Evidence Badges]
+        P4[Pillar 4: AI CFO Co-Pilot - Constraint-Aware Verified Chat]
+        P5[Pillar 5: Research Lab - PersonaLedger & Defense Metrics]
     end
 
     subgraph ServiceLayer ["Service Layer (FastAPI / Python 3.11+)"]
-        Gateway[API Gateway & Router]
-        Svc_Profile[Profile Engine - Period Normalization Math]
-        Svc_Recs[Multi-Tier Recommendation Orchestrator]
-        Svc_Verifier[Strict Numeric Claim Verifier]
-        Svc_Simulator[Purchase Affordability Simulator]
+        Gateway[API Gateway & Unified Routers]
+        Svc_Profile[Profile & Constraint Engine - Safe-to-Spend Today]
+        Svc_Simulator[Deterministic Cash-Flow Stress-Tester & Scenarios]
+        Svc_Review[Behavioral Autopsy & Spending Delta Attribution]
+        Svc_Import[Smart UPI Context Stitcher & Cluster Resolvers]
+        Svc_Recurring[Phantom Drain & Price Creep Detector]
+        Svc_Verifier[Strict Numeric Evidence & Claim Verifier]
+        Svc_Chat[Constraint-Aware Conversational Assistant]
         Svc_Lab[PersonaLedger Academic Benchmark Runner]
     end
 
@@ -68,19 +76,25 @@ graph TD
         DB_SQLite[(Local SQLite3)]
     end
 
-    UI_Shell --> Gateway
-    UI_Views --> Gateway
+    UI_Shell --> P1 & P2 & P3 & P4 & P5
+    P1 & P2 & P3 & P4 & P5 --> Gateway
 
     Gateway --> Svc_Profile
-    Gateway --> Svc_Recs
-    Gateway --> Svc_Verifier
     Gateway --> Svc_Simulator
+    Gateway --> Svc_Review
+    Gateway --> Svc_Import
+    Gateway --> Svc_Recurring
+    Gateway --> Svc_Verifier
+    Gateway --> Svc_Chat
     Gateway --> Svc_Lab
 
     Svc_Profile --> Driver
-    Svc_Recs --> Driver
-    Svc_Verifier --> Driver
     Svc_Simulator --> Driver
+    Svc_Review --> Driver
+    Svc_Import --> Driver
+    Svc_Recurring --> Driver
+    Svc_Verifier --> Driver
+    Svc_Chat --> Driver
     Svc_Lab --> Driver
 
     Driver --> DB_Postgres
@@ -89,32 +103,39 @@ graph TD
 
 ---
 
-## Primary Modules
+## 5 Core Product Pillars
 
-### Personal Finance Workspace
-- **Overview Dashboard:** Executive financial snapshot displaying total income, expenses, net cashflow trajectory, available balance, goal pacing, and latest verified recommendation.
-- **Statement Ingestion & Deduplication:** Drag-and-drop CSV/JSON importer with automatic bank header detection, client-side column mapping confirmation, and SHA-256 duplicate transaction elimination.
-- **Transactions Ledger:** Complete ledger history with multi-filter search, direction categorization, manual entry, inline editing, and deletion.
-- **Smart Budgeting:** Category-level monthly spending limits, real-time progress bars, default vs. month-specific override rules, and overrun alerts.
-- **Subscriptions & Recurring Payments:** Intelligent recurring charge detection (interval, merchant, amount), upcoming 30-day payment schedule, and cancel/pause status management.
-- **Unusual Spending (Anomaly Detection):** Statistical outlier detection via Z-Score and Isolation Forest with human-in-the-loop review lifecycle (`new`, `reviewed`, `confirmed_unusual`, `dismissed`).
-- **Cash Flow Forecast:** 30-, 60-, and 90-day balance projections factoring historical spending pace, variable expense volatility, and upcoming recurring bills.
-- **Monthly Financial Review:** Month-over-month executive review comparing income, spending, net savings, and category shifts with plain-language AI explanation.
-- **Ask FinSight (Conversational Copilot):** Natural language conversational assistant computing ledger answers deterministically with automated claim verification fallback.
-- **Multi-System Recommendation Viewer (R1–R4):** 
-  - *System A (R1):* Deterministic 25% threshold rule against top discretionary category.
-  - *System B (R2):* Profile-conditioned rule engine.
-  - *System B-Ablation:* Unstructured heuristic baseline.
-  - *System C (R3):* Full evidence-grounded generative advice with itemized source transaction IDs and strict numeric claim verification.
-  - *Personalized (R4):* Tailored recommendations respecting user-protected categories.
-- **Purchase Affordability Simulator:** Evaluates prospective purchases against liquidity, upcoming recurring commitments, emergency reserves, and active savings goals.
-- **Goal Management & Invariant Protection:** Goal tracking with shortfall estimation and contractual category protection toggles.
+### Pillar 1: Command Center (`overview-view.tsx`)
+- **True Safe-to-Spend Today (₹/day):** Replaces static bank balances with real-time safe daily spending:
+  $$\text{Safe Daily Spend} = \frac{\text{Raw Balance} - \text{Unpaid Fixed Obligations} - \text{Hard Floor Buffer} - \text{Essential Burn}}{\text{Remaining Days in Billing Cycle}}$$
+- **Persistent Constraint Memory:** Real-time interactive constraint management for `HARD_FLOOR` (emergency liquidity buffer), `FIXED_OBLIGATION` (rent, hostel fees, remittances), `BEHAVIORAL_CAP` (e.g., max 2 late-night orders/week), and `PENDING_IOU` (split bills owed to the user).
+- **Smart UPI Context Stitcher:** Clusters ambiguous P2P UPI transfers by time-of-day (commute, lunch, late-night) and handle frequency, offering 1-tap categorization or split-bill IOU creation.
+- **Consolidated Sub-Tabs:** Fast navigation between Executive Command Center, Ledger Transactions, Smart Budgets, and Profile Invariants.
 
-### Synthetic Research Laboratory
-- **PersonaLedger Dataset:** Deterministic 1,000-row synthetic ledger across 10 distinct consumer profiles (seed `42`) to support zero-leakage academic evaluation.
+### Pillar 2: Counterfactual Decision Simulator (`simulate-view.tsx`)
+- **"Can I Afford This?" Sandbox:** Evaluates prospective one-time or EMI purchases over 30–90 days against historical daily burn velocity, recurring commitments, and active constraints.
+- **Deterministic Stress-Testing:** Computes real liquidity **survival probability** (0–100%) and pinpoints exact constraint violations (e.g., *"Breaches ₹5,000 Hard Floor on Day 18 due to Rent"*).
+- **Runway Timeline & Alternatives:** Displays Before vs. After liquidity runway bars and generates counterfactual alternatives (*"Delay purchase by 11 days"*, *"Opt for 3-month EMI"*, or *"Reduce dining velocity by ₹75/day"*).
+- **Consolidated Sub-Tabs:** Direct switching to 30-Day Forecast projections and Goal Feasibility tracking.
+
+### Pillar 3: Behavioral Autopsy (`review-view.tsx`)
+- **Root-Cause Spending Change Attribution (Delta Engine):** Decomposes spending shifts against baseline periods into **Frequency Drift** (ordering more often) vs. **Ticket-Size Inflation** (buying pricier items).
+- **Late-Night Velocity Firewall:** Automatically monitors and flags high-risk micro-bleeds occurring between 10:30 PM and 2:00 AM.
+- **Phantom Drain Hunter:** Detects unannounced subscription price hikes (e.g., Netflix drift from ₹649 to ₹799) and overlapping recurring mandates.
+- **Evidence Verification Badges:** Every insight card includes a verified trust badge. Clicking the badge reveals a citation drawer displaying exact supporting transaction receipts.
+- **Consolidated Sub-Tabs:** Direct navigation to Phantom Drains, Anomaly Review, and Verified Recommendations.
+
+### Pillar 4: Constraint-Aware AI CFO Co-Pilot (`chat-view.tsx`)
+- **Conversational Defense Engine:** An AI CFO co-pilot that answers financial queries deterministically from the database ledger.
+- **Active Constraint Memory Panel:** Dual-column UI with a live side panel tracking active inviolable constraints and offering 1-tap constraint injection suggestions.
+- **Strict Citation Grounding:** Answers are checked against `verifier_service.py` to prevent arithmetic hallucinations and ungrounded claims.
+
+### Pillar 5: Synthetic Research Laboratory (`research-view.tsx`)
+- **PersonaLedger Dataset:** Deterministic 1,000-row synthetic ledger across 10 distinct consumer profiles (seed `42`) supporting zero-leakage academic evaluation.
 - **70/30 Temporal Holdout:** Chronological partition ensuring baseline observations strictly precede evaluation data:
   $$\max(\text{Baseline Dates}) < \min(\text{Holdout Dates})$$
 - **Controlled Perturbation Runner:** Injects controlled $+150\%$ spending shocks into holdout categories to benchmark system anomaly detection sensitivity and verifier fidelity.
+- **Defense Engine Benchmark:** Live evaluation of Claim Verification Faithfulness, Constraint Satisfaction Accuracy, and UPI Disambiguation Coverage.
 
 ---
 
@@ -142,7 +163,10 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Execute test suite (60 tests)
+# Seed demonstration data (constraints, UPI clusters, phantom drains)
+python backend/seed.py
+
+# Execute test suite
 pytest backend/tests/ -v
 
 # Start FastAPI development server
@@ -190,7 +214,7 @@ Detailed walkthroughs are provided in the [Production Deployment Handbook](docs/
 All mathematical transformations, API routers, database adapters, and claim verifiers are covered by automated unit and integration tests:
 
 ```bash
-# Run complete test suite (34 tests)
+# Run complete test suite
 pytest backend/tests/ -v
 
 # Run full-system end-to-end user journey test
@@ -201,6 +225,12 @@ pytest backend/tests/test_postgres_compatibility.py -v
 
 # Run research benchmark evaluation test
 pytest backend/tests/test_research_lab.py -v
+
+# Run claim verifier strict tolerance test
+pytest backend/tests/test_claim_verifier.py -v
+
+# Run affordability counterfactual stress test
+pytest backend/tests/test_affordability.py -v
 ```
 
 ---

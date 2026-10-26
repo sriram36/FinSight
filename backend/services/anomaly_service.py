@@ -160,15 +160,20 @@ def get_user_anomalies(user_id: str, db, status_filter: Optional[str] = None) ->
         """, (user_id,))
         
     rows = cursor.fetchall()
-    return [
-        {
+    from backend.services.verifier_service import bind_evidence_bundle
+    results = []
+    for r in rows:
+        amount = float(r["amount"])
+        baseline = float(r["baseline_amount"] or 0.0)
+        tx_ids = [r["transaction_id"]] if r["transaction_id"] else []
+        results.append({
             "id": r["id"],
             "user_id": r["user_id"],
             "transaction_id": r["transaction_id"],
             "title": r["title"],
             "category": r["category"],
-            "amount": float(r["amount"]),
-            "baseline_amount": float(r["baseline_amount"] or 0.0),
+            "amount": amount,
+            "baseline_amount": baseline,
             "deviation_pct": float(r["deviation_pct"] or 0.0),
             "alert_type": r["alert_type"],
             "severity": r["severity"],
@@ -176,10 +181,16 @@ def get_user_anomalies(user_id: str, db, status_filter: Optional[str] = None) ->
             "status": r["status"],
             "user_decision": r["user_decision"],
             "created_at": r["created_at"],
-            "updated_at": r["updated_at"]
-        }
-        for r in rows
-    ]
+            "updated_at": r["updated_at"],
+            "evidence_bundle": bind_evidence_bundle(
+                tx_ids,
+                amount,
+                baseline,
+                extra={"flagged_amount": amount, "baseline_amount": baseline},
+                claim_text=f"Flagged ₹{amount:,.2f} against baseline ₹{baseline:,.2f}.",
+            ),
+        })
+    return results
 
 def review_anomaly(anomaly_id: str, user_id: str, status: str, user_decision: Optional[str], db) -> bool:
     cursor = db.cursor()

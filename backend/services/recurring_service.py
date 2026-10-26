@@ -129,6 +129,10 @@ def detect_recurring_from_ledger(user_id: str, db) -> List[Dict[str, Any]]:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (item_id, user_id, merchant, cat, latest_amount, frequency, next_due.isoformat(), last_date.isoformat(), status, is_confirmed, confidence, price_change, now_iso))
 
+            amounts = [t["amount"] for t in txs_sorted]
+            first_amt = amounts[0]
+            price_creep_pct = round(((latest_amount - first_amt) / first_amt) * 100.0, 2) if first_amt else 0.0
+            is_phantom = bool(price_change) or price_creep_pct >= 8.0
             detected_items.append({
                 "id": item_id,
                 "merchant": merchant,
@@ -142,10 +146,24 @@ def detect_recurring_from_ledger(user_id: str, db) -> List[Dict[str, Any]]:
                 "occurrence_count": len(txs),
                 "notes": price_change,
                 "price_change_note": price_change,
-                "status": status
+                "status": status,
+                "is_phantom_drain": is_phantom,
+                "price_creep_pct": price_creep_pct,
+                "baseline_amount": first_amt,
+                "transaction_ids": [t["id"] for t in txs_sorted],
             })
 
     db.commit()
+    # Flag overlapping recurring charges (same merchant family within 3 days)
+    by_norm = defaultdict(list)
+    for item in detected_items:
+        by_norm[item["merchant"].split()[0].lower()].append(item)
+    for group in by_norm.values():
+        if len(group) < 2:
+            continue
+        for item in group:
+            item["overlapping_recurring"] = True
+            item["is_phantom_drain"] = True
     return detected_items
 
 def get_recurring_items(user_id: str, db) -> List[Dict[str, Any]]:
@@ -171,7 +189,9 @@ def get_recurring_items(user_id: str, db) -> List[Dict[str, Any]]:
             "is_confirmed": bool(r["is_confirmed"]),
             "confidence": float(r["confidence"] or 1.0),
             "notes": r["notes"],
-            "created_at": r["created_at"]
+            "created_at": r["created_at"],
+            "is_phantom_drain": bool(r["notes"] and "increased" in str(r["notes"]).lower()),
+            "price_change_note": r["notes"],
         }
         for r in rows
     ]

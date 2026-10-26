@@ -325,37 +325,17 @@ Create savings goal → enter amount and target date → protect categories → 
 Open Research Lab → select the approved dataset/run → inspect split → run A/B/B-ablation/C → run perturbation → review recommendation distribution, responsiveness, validation proxy and evidence verification.
 ```
 
-# 10. Information Architecture and UI
+# 10. Information Architecture and UI (4 Core Pillars + Research Lab)
 
+FinSight AI transforms fragmented multi-tab financial dashboards into **4 Core Closed-Loop Product Pillars + The Academic Research Lab**, eliminating the "12-tab feature soup" problem while preserving full depth through contextual sub-tab navigation:
 
-|Route/page|Purpose|Priority|
+| Pillar / Core View | Sub-Tabs & Integrated Modules | Primary Product Defense Capability |
 |---|---|---|
-
-|/|Landing / product explanation / demo entry|P0|
-
-|/dashboard|Spending overview, material changes and next actions|P0|
-
-|/transactions|CSV import, transaction list, search, filter, category edit|P0|
-
-|/profile|Baselines, recent pace, category deviations and recurring patterns|P0|
-
-|/recommendations|Evidence-grounded advice and verification status|P0|
-
-|/simulate|Can I Afford This and scenario comparison|P0|
-
-|/goals|Savings goals, protected categories and conflicts|P0|
-
-|/assistant|Structured natural-language questions and intents|P1|
-
-|/history|What changed since last visit and decision replay|P1|
-
-|/experiments|Opt-in 21-day user experiments and results|P1|
-
-|/research|Dataset, four configurations, perturbation and evaluation dashboard|P0 for research demo|
-
-|/settings|Profile, privacy, export, deletion and notifications|P0|
-
-
+| **Pillar 1: Command Center (`overview-view.tsx`)** | `Command Center`, `Ledger Transactions`, `Smart Budgets`, `Profile Invariants` | Computes **True Safe-to-Spend Today (₹/day)** vs. raw bank balance; manages active **Constraint Memory** (`HARD_FLOOR`, `FIXED_OBLIGATION`, `BEHAVIORAL_CAP`, `PENDING_IOU`); triggers **Smart UPI Context Stitcher** for 1-tap disambiguation. |
+| **Pillar 2: Decision Simulator (`simulate-view.tsx`)** | `Decision Sandbox`, `30-Day Forecast`, `Savings Goals` | **"Can I Afford This?" Pre-Purchase & EMI Cash-Flow Stress-Tester**; deterministically calculates survival probability (0–100%), pinpoints constraint breaches, visualizes Before vs. After runway bars, and generates mathematical counterfactual alternatives. |
+| **Pillar 3: Behavioral Autopsy (`review-view.tsx`)** | `Root-Cause Autopsy`, `Phantom Drains`, `Candidate Anomalies`, `Verified Insights` | **"Why Am I Broke?" Spending Change Attribution Delta Engine** (Frequency Drift vs. Ticket-Size Inflation); **Late-Night Velocity Firewall** (10:30 PM–2:00 AM micro-bleeds); **Phantom Drain & Price Creep Hunter**; mandatory **Evidence Verification Badges** linking to cited transaction receipts. |
+| **Pillar 4: AI CFO Co-Pilot (`chat-view.tsx`)** | `Conversational Assistant`, `Live Constraint Memory Panel` | Conversational financial copilot that reads and writes persistent constraints, operates directly on verified database records, and cites verifiable transaction receipts with automated claim verification. |
+| **Pillar 5: Synthetic Research Laboratory (`research-view.tsx`)** | `Benchmark Evaluation`, `Temporal Split`, `Perturbation Runner`, `Defense Engine Metrics` | **Preserved academic evaluation lab**: PersonaLedger 1,000-row benchmark across 10 profiles (seed `42`), 70/30 temporal holdouts, +150% perturbation studies, and live Defense Engine benchmarking (Claim Faithfulness, Constraint Satisfaction, UPI Clustering). |
 
 ## 10.1 Design direction
 
@@ -525,6 +505,8 @@ Use strict schema validation with Pydantic on the API side and a supported struc
 
 |goals|id, user_id, target_amount, target_date, current_progress, assumptions_json, status|Savings goal definition and progress.|
 
+|user_constraints|id, user_id, constraint_type, name, amount, frequency, due_date, active, metadata_json|Persistent user constraints (HARD_FLOOR, FIXED_OBLIGATION, BEHAVIORAL_CAP, PENDING_IOU).|
+
 |category_preferences|id, user_id, category, is_protected, reason, updated_at|Protected spending constraints.|
 
 |recommendations|id, user_id, profile_snapshot_id, configuration, category, output_json, prompt_version, model_id, created_at|Recommendation output plus provenance.|
@@ -564,6 +546,20 @@ Use migrations, foreign keys, appropriate indexes, parameterized queries and per
 |PATCH /transactions/{id}|Edit transaction/category|Checks ownership; logs category override.|
 
 |DELETE /transactions/{id}|Delete transaction|Checks ownership and invalidates dependent profile snapshots as needed.|
+
+|GET /profile/safe-to-spend|True Safe-to-Spend Today|Computes safe daily spend, raw balance, locked constraints, and cycle runway days.|
+
+|GET /profile/constraints|List constraints|Returns active HARD_FLOOR, FIXED_OBLIGATION, BEHAVIORAL_CAP, PENDING_IOU constraints.|
+
+|POST /profile/constraints|Create constraint|Creates or persists new user constraint rule.|
+
+|DELETE /profile/constraints/{id}|Delete constraint|Deactivates or removes a user constraint.|
+
+|GET /transactions/context-prompts|Smart UPI Context Prompts|Returns 1-tap disambiguation clusters for uncategorized/P2P transfers.|
+
+|POST /transactions/resolve-cluster|Resolve transaction cluster|Batch updates categories and optionally creates a PENDING_IOU constraint.|
+
+|GET /research/defense-metrics|Defense Engine Benchmarks|Returns live Claim Verification Faithfulness, Constraint Accuracy, and UPI Coverage.|
 
 |GET /profile|Get current profile|Returns feature values, date windows, formula version and missing-data notes.|
 

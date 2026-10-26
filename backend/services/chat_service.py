@@ -109,7 +109,9 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         date_label = f"over the last 90 days ({date_filter[0]} to {date_filter[1]})"
 
     # Intent classification
-    if any(w in msg_lower for w in ["afford", "can i buy", "purchase", "affordability"]):
+    if any(w in msg_lower for w in ["keep ₹", "keep rs", "hard floor", "set a floor", "constraint", "rent on the", "add constraint", "iou"]):
+        intent = "constraint_write"
+    elif any(w in msg_lower for w in ["afford", "can i buy", "purchase", "affordability"]):
         intent = "affordability_check"
     elif any(w in msg_lower for w in ["which budget", "budget status", "budgets", "burn rate", "likely to exceed"]):
         intent = "budget_status"
@@ -137,7 +139,67 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
     deterministic_reply = ""
     suggested_followups = []
 
-    if intent == "affordability_check" and target_amount:
+    if intent == "constraint_write":
+        from backend.services.profile_service import create_user_constraint, list_user_constraints, calculate_true_safe_to_spend
+        from backend.schemas.profile import UserConstraintCreate
+        from backend.services.verifier_service import bind_evidence_bundle
+
+        ctype = "HARD_FLOOR"
+        label = "Emergency hard floor"
+        due_day = None
+        if "rent" in msg_lower or "hostel" in msg_lower or "mess" in msg_lower:
+            ctype = "FIXED_OBLIGATION"
+            label = "Rent / fixed obligation"
+            day_m = re.search(r'\b(?:on the |due )?(\d{1,2})(?:st|nd|rd|th)?\b', msg_lower)
+            if day_m:
+                due_day = max(1, min(28, int(day_m.group(1))))
+        elif "iou" in msg_lower or "split" in msg_lower:
+            ctype = "PENDING_IOU"
+            label = "Pending split-bill IOU"
+        elif "late-night" in msg_lower or "late night" in msg_lower or "cap" in msg_lower:
+            ctype = "BEHAVIORAL_CAP"
+            label = "Behavioral spending cap"
+
+        amount_val = target_amount
+        if amount_val is None:
+            amt2 = re.search(r'(?:₹|\$|rs\.?)\s*([0-9,]+(?:\.[0-9]+)?)', message, re.IGNORECASE)
+            if not amt2:
+                amt2 = re.search(r'\b([0-9]{3,6})\b', msg_lower)
+            if amt2:
+                amount_val = float(amt2.group(1).replace(",", ""))
+        amount_val = float(amount_val or 3000.0)
+
+        created = create_user_constraint(
+            UserConstraintCreate(
+                user_id=user_id,
+                constraint_type=ctype,  # type: ignore
+                label=label,
+                amount=amount_val,
+                due_day=due_day,
+            ),
+            db,
+        )
+        sts = calculate_true_safe_to_spend(user_id, db)
+        facts = {
+            "constraint_type": ctype,
+            "amount": amount_val,
+            "safe_to_spend_today": sts.safe_to_spend_today,
+            "raw_balance": sts.raw_balance,
+            "locked_by_constraints": sts.locked_by_constraints,
+        }
+        evidence = facts.copy()
+        deterministic_reply = (
+            f"Saved a {ctype.replace('_', ' ').title()} of ₹{amount_val:,.2f} ({created.label}). "
+            f"True safe-to-spend today is now ₹{sts.safe_to_spend_today:,.2f}/day against a raw balance of ₹{sts.raw_balance:,.2f} "
+            f"with ₹{sts.locked_by_constraints:,.2f} locked by constraints."
+        )
+        suggested_followups = [
+            "Can I afford a ₹12,000 weekend trip?",
+            "Show my active constraints",
+            "What is my liquidity runway?",
+        ]
+
+    elif intent == "affordability_check" and target_amount:
         # Fetch current liquidity from real income vs spending (NEVER invent numbers)
         cursor.execute("""
         SELECT 
@@ -580,6 +642,23 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
     # Re-verify final reply to provide transparent audit badge
     audit_verification = verify_recommendation_claims(final_reply, evidence, tolerance=0.01)
 
+    from backend.services.verifier_service import bind_evidence_bundle
+    from backend.services.profile_service import list_user_constraints as _list_constraints
+    cited_ids = [t.get("id") for t in cited_transactions if t.get("id")]
+    exact_sum = float(evidence.get("total_spent") or evidence.get("purchase_amount") or evidence.get("exact_sum") or 0.0)
+    baseline_sum = float(evidence.get("baseline_amount") or evidence.get("available_balance") or 0.0)
+    evidence_bundle = bind_evidence_bundle(
+        cited_ids,
+        exact_sum,
+        baseline_sum,
+        extra={k: v for k, v in evidence.items() if isinstance(v, (int, float)) and not isinstance(v, bool)},
+        claim_text=final_reply,
+    )
+    try:
+        active_constraints = [c.model_dump() for c in _list_constraints(user_id, db, active_only=True)]
+    except Exception:
+        active_constraints = []
+
     return {
         "reply": final_reply,
         "intent": intent,
@@ -590,5 +669,7 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         "model": model_name,
         "cited_transactions": cited_transactions,
         "suggested_followups": suggested_followups,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "evidence_bundle": evidence_bundle,
+        "active_constraints": active_constraints,
     }

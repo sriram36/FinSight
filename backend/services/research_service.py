@@ -624,3 +624,91 @@ def run_perturbation_experiment(
             }
         }
     }
+
+
+def get_defense_engine_metrics() -> Dict[str, Any]:
+    """
+    Research Lab expansion: faithfulness of the claim verifier, constraint-satisfaction
+    accuracy of the counterfactual simulator, and UPI context clustering coverage.
+    Does not alter the four-way PersonaLedger benchmark contract.
+    """
+    configs = run_four_way_benchmark()
+    config_map = {c["configuration"]: c for c in configs}
+    cvr = float(config_map.get("C", {}).get("numeric_verification_pass_rate") or 0.0)
+
+    rows = load_synthetic_dataset()
+    ambiguous = [
+        r for r in rows
+        if r["direction"] == "debit" and r["category"] in EXCLUDED_CATEGORIES
+    ]
+    grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in ambiguous:
+        key = (r.get("description") or "unknown").lower()[:40]
+        grouped[key].append(r)
+    clustered_n = sum(len(v) for v in grouped.values() if len(v) >= 2)
+    coverage = round(clustered_n / max(1, len(ambiguous)), 3) if ambiguous else 1.0
+
+    constraint_accuracy = _probe_constraint_satisfaction()
+
+    return {
+        "experiment_name": "Defense Engine Benchmark Card",
+        "claim_verification_faithfulness_rate": cvr,
+        "claim_verification_faithfulness_rate_display": f"{int(round(cvr * 10))}/10 personas" if cvr <= 1 else f"{cvr}",
+        "constraint_satisfaction_accuracy": constraint_accuracy,
+        "upi_context_clustering_coverage": coverage,
+        "upi_ambiguous_transfers": len(ambiguous),
+        "upi_clustered_transfers": clustered_n,
+        "notes": [
+            "Faithfulness is System C numeric verification pass rate on the 70/30 PersonaLedger holdout.",
+            "Constraint satisfaction is a deterministic cash-flow probe: known remainder must match ₹50,000.00 and survival must stay defined.",
+            "UPI clustering coverage is the share of ambiguous/transfer-like synthetic debits that fall into size>=2 description clusters.",
+        ],
+        "benchmark_systems": configs,
+    }
+
+
+def _probe_constraint_satisfaction() -> float:
+    import sqlite3
+    from backend.schemas.scenario import AffordabilityRequest
+    from backend.services.affordability_service import evaluate_affordability
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.executescript(
+        """
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, email TEXT, created_at TEXT);
+        CREATE TABLE transactions (
+            id TEXT PRIMARY KEY, user_id TEXT, transaction_date TEXT, description TEXT,
+            amount REAL, direction TEXT, category TEXT
+        );
+        CREATE TABLE goals (
+            id TEXT PRIMARY KEY, user_id TEXT, title TEXT, target_amount REAL,
+            current_amount REAL, target_date TEXT, status TEXT, created_at TEXT
+        );
+        CREATE TABLE recurring_items (
+            id TEXT PRIMARY KEY, user_id TEXT, merchant TEXT, category TEXT, amount REAL,
+            frequency TEXT, next_due_date TEXT, last_seen_date TEXT, status TEXT,
+            is_confirmed INTEGER, confidence REAL, notes TEXT, created_at TEXT
+        );
+        CREATE TABLE user_constraints (
+            id TEXT PRIMARY KEY, user_id TEXT, constraint_type TEXT, label TEXT, amount REAL,
+            due_day INTEGER, is_active INTEGER, metadata_json TEXT, created_at TEXT, updated_at TEXT
+        );
+        INSERT INTO users VALUES ('probe_user', 'Probe', 'probe@local', '2026-01-01T00:00:00Z');
+        """
+    )
+    conn.commit()
+    req = AffordabilityRequest(
+        user_id="probe_user",
+        purchase_amount=15000.0,
+        available_balance=100000.0,
+        upcoming_obligations=20000.0,
+        emergency_buffer=15000.0,
+        horizon_days=30,
+    )
+    result = evaluate_affordability(req, conn)
+    conn.close()
+    remainder_ok = result.post_purchase_remainder == 50000.0
+    survival_ok = result.survival_probability is not None
+    return 1.0 if remainder_ok and survival_ok else 0.0
