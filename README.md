@@ -10,10 +10,10 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Next.js-16.4-111111?logo=next.js" alt="Next.js" />
+    <img src="https://img.shields.io/badge/Next.js-16.4.3-111111?logo=next.js" alt="Next.js" />
     <img src="https://img.shields.io/badge/FastAPI-0.110+-008080?logo=fastapi&logoColor=white" alt="FastAPI" />
     <img src="https://img.shields.io/badge/Storage-PostgreSQL%20%7C%20SQLite3-2d5a88?logo=postgresql&logoColor=white" alt="Storage" />
-    <img src="https://img.shields.io/badge/Tests-34%20Passing-2e7d32" alt="Pytest Coverage" />
+    <img src="https://img.shields.io/badge/Tests-60%20Passing-2e7d32" alt="Pytest Coverage" />
     <img src="https://img.shields.io/badge/License-MIT-444444" alt="License" />
   </p>
 </div>
@@ -93,13 +93,20 @@ graph TD
 
 ### Personal Finance Workspace
 - **Overview Dashboard:** Executive financial snapshot displaying total income, expenses, net cashflow trajectory, available balance, goal pacing, and latest verified recommendation.
-- **Statement Ingestion:** Drag-and-drop CSV importer with automatic header detection (`Date`, `Description`, `Amount`, `Category`, `Direction`), client-side mapping confirmation, and deduplication.
-- **Spending Profile Visualizer:** Category-by-category baseline vs. recent comparison with daily pacing delta indicators and zero-baseline edge case safety.
-- **Multi-System Recommendation Viewer:** 
-  - *System A:* Deterministic 25% threshold rule against top discretionary category.
-  - *System B:* Profile-conditioned generative advice.
+- **Statement Ingestion & Deduplication:** Drag-and-drop CSV/JSON importer with automatic bank header detection, client-side column mapping confirmation, and SHA-256 duplicate transaction elimination.
+- **Transactions Ledger:** Complete ledger history with multi-filter search, direction categorization, manual entry, inline editing, and deletion.
+- **Smart Budgeting:** Category-level monthly spending limits, real-time progress bars, default vs. month-specific override rules, and overrun alerts.
+- **Subscriptions & Recurring Payments:** Intelligent recurring charge detection (interval, merchant, amount), upcoming 30-day payment schedule, and cancel/pause status management.
+- **Unusual Spending (Anomaly Detection):** Statistical outlier detection via Z-Score and Isolation Forest with human-in-the-loop review lifecycle (`new`, `reviewed`, `confirmed_unusual`, `dismissed`).
+- **Cash Flow Forecast:** 30-, 60-, and 90-day balance projections factoring historical spending pace, variable expense volatility, and upcoming recurring bills.
+- **Monthly Financial Review:** Month-over-month executive review comparing income, spending, net savings, and category shifts with plain-language AI explanation.
+- **Ask FinSight (Conversational Copilot):** Natural language conversational assistant computing ledger answers deterministically with automated claim verification fallback.
+- **Multi-System Recommendation Viewer (R1–R4):** 
+  - *System A (R1):* Deterministic 25% threshold rule against top discretionary category.
+  - *System B (R2):* Profile-conditioned rule engine.
   - *System B-Ablation:* Unstructured heuristic baseline.
-  - *System C:* Full evidence-grounded generative advice with itemized source transaction IDs and strict numeric claim verification.
+  - *System C (R3):* Full evidence-grounded generative advice with itemized source transaction IDs and strict numeric claim verification.
+  - *Personalized (R4):* Tailored recommendations respecting user-protected categories.
 - **Purchase Affordability Simulator:** Evaluates prospective purchases against liquidity, upcoming recurring commitments, emergency reserves, and active savings goals.
 - **Goal Management & Invariant Protection:** Goal tracking with shortfall estimation and contractual category protection toggles.
 
@@ -135,7 +142,7 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Execute test suite (34 tests)
+# Execute test suite (60 tests)
 pytest backend/tests/ -v
 
 # Start FastAPI development server
