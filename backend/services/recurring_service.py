@@ -133,6 +133,17 @@ def detect_recurring_from_ledger(user_id: str, db) -> List[Dict[str, Any]]:
             first_amt = amounts[0]
             price_creep_pct = round(((latest_amount - first_amt) / first_amt) * 100.0, 2) if first_amt else 0.0
             is_phantom = bool(price_change) or price_creep_pct >= 8.0
+            draft = None
+            if is_phantom:
+                reason = f"unnotified price increase from ₹{first_amt:,.2f} to ₹{latest_amount:,.2f} (+{price_creep_pct}%)" if price_change else f"plan rate creep across billing cycles"
+                draft = (
+                    f"Subject: Immediate Subscription Cancellation & Autopay Revocation — {merchant}\n\n"
+                    f"To Customer Support ({merchant}),\n\n"
+                    f"Please treat this message as formal notice to immediately cancel my active subscription and revoke any recurring UPI autopay/e-mandate for {merchant}.\n\n"
+                    f"Reason: Review of bank statement records identified {reason} (current charge: ₹{latest_amount:,.2f}/{frequency}).\n\n"
+                    f"Please confirm termination with immediate effect and verify that no further debits will occur.\n\n"
+                    f"Thank you,\n[Account Holder]"
+                )
             detected_items.append({
                 "id": item_id,
                 "merchant": merchant,
@@ -151,6 +162,7 @@ def detect_recurring_from_ledger(user_id: str, db) -> List[Dict[str, Any]]:
                 "price_creep_pct": price_creep_pct,
                 "baseline_amount": first_amt,
                 "transaction_ids": [t["id"] for t in txs_sorted],
+                "cancellation_draft": draft,
             })
 
     db.commit()
@@ -175,8 +187,21 @@ def get_recurring_items(user_id: str, db) -> List[Dict[str, Any]]:
     ORDER BY amount DESC
     """, (user_id,))
     rows = cursor.fetchall()
-    return [
-        {
+    items = []
+    for r in rows:
+        is_phantom = bool(r["notes"] and "increased" in str(r["notes"]).lower())
+        draft = None
+        if is_phantom:
+            m_name = r["merchant"]
+            draft = (
+                f"Subject: Immediate Subscription Cancellation & Autopay Revocation — {m_name}\n\n"
+                f"To Customer Support ({m_name}),\n\n"
+                f"Please treat this message as formal notice to immediately cancel my active subscription and revoke any recurring UPI autopay/e-mandate for {m_name}.\n\n"
+                f"Reason: Review of bank statement records identified an unnotified price increase ({r['notes']}).\n\n"
+                f"Please confirm termination with immediate effect and verify that no further debits will occur.\n\n"
+                f"Thank you,\n[Account Holder]"
+            )
+        items.append({
             "id": r["id"],
             "user_id": r["user_id"],
             "merchant": r["merchant"],
@@ -190,11 +215,11 @@ def get_recurring_items(user_id: str, db) -> List[Dict[str, Any]]:
             "confidence": float(r["confidence"] or 1.0),
             "notes": r["notes"],
             "created_at": r["created_at"],
-            "is_phantom_drain": bool(r["notes"] and "increased" in str(r["notes"]).lower()),
+            "is_phantom_drain": is_phantom,
             "price_change_note": r["notes"],
-        }
-        for r in rows
-    ]
+            "cancellation_draft": draft,
+        })
+    return items
 
 def confirm_recurring_item(item_id: str, user_id: str, is_confirmed: bool, db) -> bool:
     cursor = db.cursor()

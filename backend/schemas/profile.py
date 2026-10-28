@@ -75,5 +75,6 @@ class SafeToSpendResponse(BaseModel):
     runway_days_remaining: int
     next_inflow_date: Optional[str] = None
     active_constraints: List[UserConstraint] = Field(default_factory=list)
+    behavioral_cap_violations: List[Dict[str, Any]] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
     calculated_at: str

@@ -485,6 +485,39 @@ export function OverviewView({ onOpenImport, onNavigateTab, initialSubTab = 'ove
             </div>
           </section>
 
+          {/* ── BEHAVIORAL CAP VIOLATIONS ALERT BANNER ─────────────── */}
+          {safeToSpend?.behavioral_cap_violations && safeToSpend.behavioral_cap_violations.length > 0 && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 backdrop-blur-sm space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="size-4 shrink-0" />
+                  </div>
+                  <h3 className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                    Behavioral Spending Cap Alerts ({safeToSpend.behavioral_cap_violations.length})
+                  </h3>
+                </div>
+                <span className="text-[11px] font-mono text-amber-700 dark:text-amber-300 font-semibold">
+                  Rule Enforcement Active
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {safeToSpend.behavioral_cap_violations.map((viol, idx) => (
+                  <div key={idx} className="rounded-xl border border-amber-500/25 bg-background/80 p-3.5 text-xs text-muted-foreground flex flex-col gap-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between font-bold text-foreground">
+                      <span>{viol.label}</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-mono">₹{viol.weekly_cap.toLocaleString('en-IN')}/wk</span>
+                    </div>
+                    <p className="leading-relaxed">{viol.message}</p>
+                    <div className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold pt-1 border-t border-border/40">
+                      Overage: +₹{viol.overage_per_day.toLocaleString('en-IN')}/day above velocity ceiling
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── 1-TAP SMART UPI CONTEXT STITCHER CARDS ──────────────── */}
           {contextPrompts.length > 0 && (
             <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-xs">

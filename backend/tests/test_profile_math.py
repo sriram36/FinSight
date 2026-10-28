@@ -72,3 +72,31 @@ def test_profile_zero_baseline_safety(db):
     assert retail is not None
     assert retail.is_low_baseline is True
     assert retail.percentage_deviation is None  # Must not crash or be +9999%
+
+
+def test_true_safe_to_spend_with_behavioral_cap(db):
+    from backend.services.profile_service import calculate_true_safe_to_spend
+    cursor = db.cursor()
+    cursor.execute("INSERT OR IGNORE INTO users (id, name, created_at) VALUES ('user_bcap', 'BCap User', '2026-01-01T00:00:00Z')")
+    cursor.execute("""
+    INSERT INTO user_constraints (
+        id, user_id, constraint_type, label, amount, due_day, is_active, metadata_json, created_at, updated_at
+    ) VALUES ('cst_bcap_1', 'user_bcap', 'BEHAVIORAL_CAP', 'Dining Weekly Limit', 350.0, NULL, 1, '{}', '2026-01-01', '2026-01-01')
+    """)
+    # Insert income and essential spend
+    cursor.execute("""
+    INSERT INTO transactions (id, user_id, transaction_date, description, amount, direction, category, created_at)
+    VALUES ('tx_inc_1', 'user_bcap', '2026-10-01', 'Salary', 50000.0, 'income', 'Income', '2026-10-01')
+    """)
+    cursor.execute("""
+    INSERT INTO transactions (id, user_id, transaction_date, description, amount, direction, category, created_at)
+    VALUES ('tx_sp_1', 'user_bcap', '2026-10-05', 'Groceries', 6000.0, 'spending', 'Groceries', '2026-10-05')
+    """)
+    db.commit()
+
+    sts = calculate_true_safe_to_spend('user_bcap', db, raw_balance=44000.0)
+    assert sts.safe_to_spend_today > 0
+    assert hasattr(sts, 'behavioral_cap_violations')
+    assert len(sts.behavioral_cap_violations) >= 1
+    assert "Dining Weekly Limit" in sts.behavioral_cap_violations[0]["label"]
+

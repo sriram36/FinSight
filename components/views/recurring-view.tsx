@@ -15,7 +15,10 @@ import {
   Check,
   ArrowRight,
   RefreshCw,
-  BellRing
+  BellRing,
+  Mail,
+  Copy,
+  FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CategoryBadge } from '@/components/ui/category-badge'
@@ -28,6 +31,8 @@ export function RecurringView() {
   const [loading, setLoading] = useState(true)
   const [detecting, setDetecting] = useState(false)
   const [filter, setFilter] = useState<'all' | 'confirmed' | 'unconfirmed'>('all')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [expandedDraftId, setExpandedDraftId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -294,6 +299,47 @@ export function RecurringView() {
                       <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
                         <AlertTriangle className="size-3.5" />
                         <span>{item.notes}</span>
+                      </div>
+                    )}
+
+                    {item.cancellation_draft && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.cancellation_draft!)
+                              setCopiedId(item.id)
+                              setTimeout(() => setCopiedId(null), 2500)
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-500/20 transition shadow-2xs"
+                          >
+                            {copiedId === item.id ? (
+                              <>
+                                <Check className="size-3 text-emerald-500" />
+                                <span>Copied Email Draft!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="size-3" />
+                                <span>Copy Cancellation & Dispute Email</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedDraftId(expandedDraftId === item.id ? null : item.id)}
+                            className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                          >
+                            {expandedDraftId === item.id ? 'Hide Draft Preview' : 'Preview Draft'}
+                          </button>
+                        </div>
+
+                        {expandedDraftId === item.id && (
+                          <div className="rounded-xl border border-border/80 bg-muted/30 p-3.5 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                            {item.cancellation_draft}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

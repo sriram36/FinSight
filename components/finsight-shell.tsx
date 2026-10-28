@@ -119,7 +119,7 @@ export function FinSightShell() {
   const [mode, setMode] = useState<'personal' | 'research'>('personal')
   const [activeView, setActiveView] = useState('Command Center')
   const [overviewSubTab, setOverviewSubTab] = useState<'overview' | 'transactions' | 'budgets' | 'profile'>('overview')
-  const [simulateSubTab, setSimulateSubTab] = useState<'simulator' | 'forecast' | 'goals'>('simulator')
+  const [simulateSubTab, setSimulateSubTab] = useState<'simulator' | 'kfs-auditor' | 'forecast' | 'goals'>('simulator')
   const [reviewSubTab, setReviewSubTab] = useState<'autopsy' | 'recurring' | 'anomalies' | 'recommendations'>('autopsy')
   const [showImport, setShowImport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -214,6 +214,10 @@ export function FinSightShell() {
     } else if (t.includes('forecast')) {
       setActiveView('Decision Simulator')
       setSimulateSubTab('forecast')
+      setMode('personal')
+    } else if (t.includes('kfs') || t.includes('auditor') || t.includes('fine-print') || t.includes('trap')) {
+      setActiveView('Decision Simulator')
+      setSimulateSubTab('kfs-auditor')
       setMode('personal')
     } else if (t.includes('goal')) {
       setActiveView('Decision Simulator')

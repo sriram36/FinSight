@@ -6,7 +6,7 @@ from backend.database import init_db
 from backend.routers import (
     health, imports, transactions, profile, goals, scenarios,
     recommendations, research, chat, budgets, recurring, auth,
-    anomalies, forecast, review
+    anomalies, forecast, review, documents
 )
 
 @asynccontextmanager
@@ -60,6 +60,7 @@ app.include_router(chat.router)
 app.include_router(anomalies.router)
 app.include_router(forecast.router)
 app.include_router(review.router)
+app.include_router(documents.router)
 
 
 

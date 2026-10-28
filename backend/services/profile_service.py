@@ -347,12 +347,30 @@ def calculate_true_safe_to_spend(user_id: str, db, raw_balance: Optional[float] 
     else:
         runway = remaining_days if uncommitted >= 0 else 0
 
+    behavioral_caps = [c for c in constraints if c.constraint_type == "BEHAVIORAL_CAP" and c.amount > 0]
+    behavioral_cap_violations = []
+    for cap in behavioral_caps:
+        daily_cap = round(cap.amount / 7.0, 2)
+        if daily_burn > daily_cap:
+            overage = round(daily_burn - daily_cap, 2)
+            behavioral_cap_violations.append({
+                "constraint_id": cap.id,
+                "label": cap.label,
+                "weekly_cap": cap.amount,
+                "daily_cap": daily_cap,
+                "current_daily_velocity": round(daily_burn, 2),
+                "overage_per_day": overage,
+                "message": f"Daily burn rate of ₹{daily_burn:,.0f}/day exceeds your '{cap.label}' cap of ₹{daily_cap:,.0f}/day (₹{cap.amount:,.0f}/week)."
+            })
+
     assumptions = [
         f"Raw balance {'supplied' if raw_balance is not None else 'derived from ledger net cash flow'}: ₹{raw:,.2f}",
         f"Locked by constraints (hard floor + unpaid fixed obligations): ₹{locked:,.2f}",
         f"Predicted essential burn until next inflow ({days_until_inflow}d): ₹{essential_burn:,.2f}",
         f"Cycle remaining days: {remaining_days}",
     ]
+    if behavioral_cap_violations:
+        assumptions.append(f"Behavioral caps flagged: {len(behavioral_cap_violations)} active spending cap exceeded.")
 
     return SafeToSpendResponse(
         user_id=user_id,
@@ -366,6 +384,7 @@ def calculate_true_safe_to_spend(user_id: str, db, raw_balance: Optional[float] 
         runway_days_remaining=runway,
         next_inflow_date=next_inflow.isoformat() if next_inflow else None,
         active_constraints=constraints,
+        behavioral_cap_violations=behavioral_cap_violations,
         assumptions=assumptions,
         calculated_at=datetime.now(timezone.utc).isoformat(),
     )

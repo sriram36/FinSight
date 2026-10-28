@@ -145,6 +145,8 @@ export interface AffordabilityResponse {
   assumptions: string[]
   goal_impacts: AffordabilityGoalImpact[]
   survival_probability?: number | null
+  survival_p10?: number | null
+  survival_p90?: number | null
   constraint_violations?: Array<{
     constraint_type: string
     label: string
@@ -236,6 +238,9 @@ export interface RecurringItem {
   notes?: string | null
   occurrence_count?: number
   days_remaining?: number
+  is_phantom_drain?: boolean
+  price_change_note?: string | null
+  cancellation_draft?: string | null
   created_at: string
 }
 
@@ -393,6 +398,15 @@ export interface SafeToSpendResponse {
   runway_days_remaining: number
   next_inflow_date?: string | null
   active_constraints: UserConstraint[]
+  behavioral_cap_violations?: Array<{
+    constraint_id: string
+    label: string
+    weekly_cap: number
+    daily_cap: number
+    current_daily_velocity: number
+    overage_per_day: number
+    message: string
+  }>
   assumptions: string[]
   calculated_at: string
 }
@@ -446,4 +460,23 @@ export interface AuthUser {
   token: string
   created_at?: string
   is_demo?: boolean
+}
+
+export interface KFSFlag {
+  category: string
+  severity: 'HIGH' | 'MEDIUM' | 'LOW' | string
+  headline: string
+  finding: string
+  plain_language_advice: string
+}
+
+export interface KFSAuditResponse {
+  filename: string
+  trap_score: number
+  risk_level: 'TRANSPARENT' | 'MODERATE_RISK' | 'HIGH_RISK' | 'PREDATORY' | string
+  summary: string
+  effective_apr_note?: string | null
+  flags: KFSFlag[]
+  key_terms_extracted: Record<string, any>
+  plain_language_comparison: string[]
 }

@@ -359,7 +359,10 @@ export function ReviewView({ initialSubTab = 'autopsy' }: ReviewViewProps) {
                         </div>
                       </div>
 
-                      <div className="mt-4 pt-3 border-t border-border/50 flex justify-end">
+                      <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground/70">
+                          Evidence Audit
+                        </span>
                         <button
                           onClick={() =>
                             openEvidenceModal(
@@ -369,10 +372,10 @@ export function ReviewView({ initialSubTab = 'autopsy' }: ReviewViewProps) {
                               card.evidence_bundle.verifier_notes
                             )
                           }
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 transition shadow-2xs"
                         >
                           <ShieldCheck className="size-3 text-emerald-500" />
-                          [Verified: {card.evidence_bundle.transaction_ids.length} Txns | ₹{card.current_spend.toLocaleString('en-IN')}]
+                          <span>Verified ({card.evidence_bundle.transaction_ids.length} cited)</span>
                         </button>
                       </div>
                     </div>

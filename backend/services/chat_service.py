@@ -138,6 +138,7 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
     cited_transactions = []
     deterministic_reply = ""
     suggested_followups = []
+    constraint_alert_text = ""
 
     if intent == "constraint_write":
         from backend.services.profile_service import create_user_constraint, list_user_constraints, calculate_true_safe_to_spend
@@ -227,12 +228,21 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         except Exception:
             confirmed_obligations = 0.0
 
+        # Query active user constraints to ground the check
+        from backend.services.profile_service import list_user_constraints
+        user_csts = list_user_constraints(user_id, db, active_only=True)
+        active_caps = [c for c in user_csts if c.constraint_type == "BEHAVIORAL_CAP"]
+        cap_warnings = []
+        for cap in active_caps:
+            if target_amount and target_amount > cap.amount:
+                cap_warnings.append(f"This purchase of ₹{target_amount:,.2f} exceeds your '{cap.label}' weekly cap of ₹{cap.amount:,.2f}.")
+
         aff_req = AffordabilityRequest(
             user_id=user_id,
             purchase_amount=target_amount,
             available_balance=verified_balance,
             upcoming_obligations=confirmed_obligations,
-            emergency_buffer=0.0
+            emergency_buffer=None
         )
         aff_result = evaluate_affordability(aff_req, db)
 
@@ -250,12 +260,21 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
         evidence["post_purchase_balance"] = round(post_bal, 2)
         evidence["available_balance"] = round(verified_balance, 2)
 
+        constraint_alert_text = ""
+        if aff_result.constraint_violations:
+            viol_msgs = [v.get("message", "") for v in aff_result.constraint_violations if v.get("message")]
+            if viol_msgs:
+                constraint_alert_text += "\n\n⚠️ **Constraint Alerts:** " + " | ".join(viol_msgs)
+        if cap_warnings:
+            constraint_alert_text += "\n\n🚨 **Behavioral Cap Alert:** " + " ".join(cap_warnings)
+
         deterministic_reply = (
             f"Based on your verified ledger cash flow (net recorded surplus of ₹{verified_balance:,.2f}), "
             f"a purchase of ₹{target_amount:,.2f} receives an affordability verdict of **{verdict.upper()}**. "
             f"After this purchase, your remaining safe balance would be ₹{post_bal:,.2f}. "
             f"{aff_result.summary} "
             f"Note: Evaluated against your confirmed ledger transactions with ₹{confirmed_obligations:,.2f} scheduled obligations."
+            f"{constraint_alert_text}"
         )
         suggested_followups = [
             f"What if I buy it next month instead?",
@@ -638,6 +657,10 @@ def process_financial_chat(user_id: str, message: str, db) -> Dict[str, Any]:
                 logger.warning(f"Chat claim verifier flagged candidate reply ({v_res.notes}); using verified deterministic reply.")
         except Exception as e:
             logger.warning(f"Chat LLM generation failed or timed out: {e}")
+
+    # Ensure critical constraint alerts are never stripped by generative summaries
+    if constraint_alert_text and constraint_alert_text.strip() not in final_reply:
+        final_reply = final_reply.strip() + constraint_alert_text
 
     # Re-verify final reply to provide transparent audit badge
     audit_verification = verify_recommendation_claims(final_reply, evidence, tolerance=0.01)

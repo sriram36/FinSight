@@ -499,6 +499,31 @@ export const api = {
     return request<any>(`/review/monthly${q}`)
   },
 
+  // KFS & Fine-Print PDF Auditor
+  auditKFS: async (file: File, userId?: string): Promise<any> => {
+    const activeUserId = userId || getActiveUserId()
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('user_id', activeUserId)
+    const authHeaders = getAuthHeader()
+    const res = await fetch(`${API_BASE}/documents/audit-kfs`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        ...authHeaders,
+      },
+    })
+    if (!res.ok) {
+      let errDetail = res.statusText
+      try {
+        const errJson = await res.json()
+        errDetail = errJson.detail || errJson.message || JSON.stringify(errJson)
+      } catch {}
+      throw new Error(`KFS Audit Error [${res.status}]: ${errDetail}`)
+    }
+    return res.json()
+  },
+
   // Authentication
   registerUser: (data: { name: string; email: string; password: string }): Promise<any> =>
     request<any>('/auth/register', {

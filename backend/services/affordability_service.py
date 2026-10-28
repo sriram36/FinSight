@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from typing import List, Dict, Any, Optional
+import numpy as np
 from backend.schemas.scenario import AffordabilityRequest, AffordabilityResponse, AffordabilityGoalImpact
 from backend.services.goal_service import calculate_goal_metrics
 from backend.services.profile_service import list_user_constraints
@@ -133,6 +134,8 @@ def evaluate_affordability(req: AffordabilityRequest, db) -> AffordabilityRespon
         assumptions=assumptions,
         goal_impacts=goal_impacts,
         survival_probability=stress["survival_probability"],
+        survival_p10=stress.get("survival_p10"),
+        survival_p90=stress.get("survival_p90"),
         constraint_violations=stress["constraint_violations"],
         counterfactual_alternatives=stress["counterfactual_alternatives"],
         runway_timeline=stress["runway_timeline"],
@@ -195,6 +198,20 @@ def run_cashflow_stress_test(
     days_ok = 0
     first_breach_day = None
 
+    # Check BEHAVIORAL_CAP constraints against observed daily burn
+    for cap in [c for c in constraints if c.constraint_type == "BEHAVIORAL_CAP" and c.amount > 0]:
+        daily_cap = cap.amount / 7.0
+        if daily_burn > daily_cap:
+            violations.append({
+                "constraint_type": "BEHAVIORAL_CAP",
+                "label": cap.label,
+                "amount": cap.amount,
+                "breach_day": 1,
+                "breach_date": today.isoformat(),
+                "projected_balance": round(balance, 2),
+                "message": f"Daily spending velocity of ₹{daily_burn:,.0f}/day breaches your '{cap.label}' cap of ₹{daily_cap:,.0f}/day (₹{cap.amount:,.0f}/week).",
+            })
+
     for i in range(horizon):
         day = today + timedelta(days=i)
         if day == buy_on:
@@ -227,7 +244,34 @@ def run_cashflow_stress_test(
                 "below_floor": below,
             })
 
-    survival = round((days_ok / horizon) * 100.0, 1)
+    # Monte Carlo simulation over daily spending volatility (300 paths)
+    N_SIMS = 300
+    daily_std = max(10.0, daily_burn * 0.35)
+    rng = np.random.default_rng(seed=42)
+    burn_sims = rng.normal(loc=daily_burn, scale=daily_std, size=(N_SIMS, horizon))
+    burn_sims = np.clip(burn_sims, 0.0, daily_burn * 3.5)
+
+    sim_survivals = []
+    for s_idx in range(N_SIMS):
+        s_bal = float(available_balance)
+        s_ok = 0
+        for d_idx in range(horizon):
+            d_date = today + timedelta(days=d_idx)
+            if d_date == buy_on:
+                s_bal -= lump
+            s_bal -= float(burn_sims[s_idx, d_idx])
+            dk = d_date.isoformat()
+            if dk in events_by_day:
+                s_bal += events_by_day[dk]
+            if floor_amt <= 0 or s_bal >= floor_amt:
+                s_ok += 1
+        sim_survivals.append((s_ok / horizon) * 100.0)
+
+    surv_arr = np.array(sim_survivals)
+    survival = round(float(np.median(surv_arr)), 1)
+    survival_p10 = round(float(np.percentile(surv_arr, 10)), 1)
+    survival_p90 = round(float(np.percentile(surv_arr, 90)), 1)
+
     alternatives: List[Dict[str, Any]] = []
     if first_breach_day is not None:
         delay_days = first_breach_day
@@ -252,16 +296,18 @@ def run_cashflow_stress_test(
         alternatives.append({
             "action": "proceed",
             "label": "Purchase stays above every active constraint across the horizon",
-            "detail": f"Survival probability {survival}% over {horizon} days.",
+            "detail": f"Survival probability {survival}% (P10: {survival_p10}%, P90: {survival_p90}%) over {horizon} days.",
         })
 
     return {
         "survival_probability": survival,
+        "survival_p10": survival_p10,
+        "survival_p90": survival_p90,
         "constraint_violations": violations,
         "counterfactual_alternatives": alternatives,
         "runway_timeline": timeline,
         "assumptions": [
-            f"Stress-tested {horizon} days using historical daily spend velocity of ₹{daily_burn:,.2f}/day.",
+            f"Monte Carlo stress-tested {horizon} days (300 paths) using velocity ₹{daily_burn:,.2f}/day (P10: {survival_p10}%, P90: {survival_p90}%).",
             f"Active constraint floor used: ₹{floor_amt:,.2f}.",
         ],
     }

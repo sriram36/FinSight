@@ -33,6 +33,8 @@ class AffordabilityResponse(BaseModel):
     assumptions: List[str] = Field(default_factory=list)
     goal_impacts: List[AffordabilityGoalImpact] = Field(default_factory=list)
     survival_probability: Optional[float] = None
+    survival_p10: Optional[float] = None
+    survival_p90: Optional[float] = None
     constraint_violations: List[Dict[str, Any]] = Field(default_factory=list)
     counterfactual_alternatives: List[Dict[str, Any]] = Field(default_factory=list)
     runway_timeline: List[Dict[str, Any]] = Field(default_factory=list)

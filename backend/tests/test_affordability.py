@@ -65,4 +65,40 @@ def test_affordability_stress_test_emi(client):
     assert "runway_timeline" in data
     assert len(data["runway_timeline"]) > 0
     assert "counterfactual_alternatives" in data
+    assert "survival_p10" in data
+    assert "survival_p90" in data
+    assert data["survival_p10"] is not None
+    assert data["survival_p90"] is not None
+
+
+def test_affordability_behavioral_cap_enforcement(client, db):
+    # Insert a BEHAVIORAL_CAP constraint with ₹700/week (₹100/day)
+    cursor = db.cursor()
+    cursor.execute("""
+    INSERT INTO user_constraints (
+        id, user_id, constraint_type, label, amount, due_day, is_active, metadata_json, created_at, updated_at
+    ) VALUES ('cst_test_bcap', 'default_user', 'BEHAVIORAL_CAP', 'Late-Night Food Cap', 700.0, NULL, 1, '{}', '2026-01-01', '2026-01-01')
+    """)
+    # Insert a spending transaction to give daily burn
+    cursor.execute("""
+    INSERT INTO transactions (
+        id, user_id, transaction_date, description, amount, direction, category, created_at
+    ) VALUES ('tx_bcap_1', 'default_user', '2026-10-20', 'Swiggy Late Night', 3500.0, 'spending', 'Dining', '2026-10-20')
+    """)
+    db.commit()
+
+    payload = {
+        "user_id": "default_user",
+        "purchase_amount": 5000.0,
+        "available_balance": 50000.0,
+        "emergency_buffer": 5000.0,
+        "horizon_days": 30
+    }
+    res = client.post("/scenarios/affordability", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    b_violations = [v for v in data.get("constraint_violations", []) if v.get("constraint_type") == "BEHAVIORAL_CAP"]
+    assert len(b_violations) >= 1
+    assert "Late-Night Food Cap" in b_violations[0]["label"]
+
 

@@ -34,6 +34,9 @@ def test_recurring_detection_and_schedule(client):
     # Price hike detected
     assert netflix_item["notes"] is not None
     assert "increased" in netflix_item["notes"].lower()
+    assert netflix_item.get("is_phantom_drain") is True
+    assert netflix_item.get("cancellation_draft") is not None
+    assert "cancel" in netflix_item["cancellation_draft"].lower()
 
     # Confirm recurring item
     confirm_res = client.post(f"/recurring/{netflix_item['id']}/confirm", json={
