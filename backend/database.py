@@ -343,6 +343,33 @@ def init_db(db_target: Optional[str] = None, auto_seed: bool = True):
     );
     """)
 
+    # Safe migrations for existing user_constraints table
+    if is_postgres(db_target):
+        try:
+            cursor.execute("ALTER TABLE user_constraints ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1;")
+            cursor.execute("ALTER TABLE user_constraints ADD COLUMN IF NOT EXISTS constraint_type TEXT DEFAULT 'FIXED_OBLIGATION';")
+            cursor.execute("ALTER TABLE user_constraints ADD COLUMN IF NOT EXISTS label TEXT DEFAULT '';")
+            cursor.execute("ALTER TABLE user_constraints ADD COLUMN IF NOT EXISTS metadata_json TEXT;")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+    else:
+        try:
+            cursor.execute("PRAGMA table_info(user_constraints);")
+            existing_c_cols = [r[1] for r in cursor.fetchall()]
+            if existing_c_cols:
+                if "is_active" not in existing_c_cols:
+                    cursor.execute("ALTER TABLE user_constraints ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;")
+                if "constraint_type" not in existing_c_cols:
+                    cursor.execute("ALTER TABLE user_constraints ADD COLUMN constraint_type TEXT NOT NULL DEFAULT 'FIXED_OBLIGATION';")
+                if "label" not in existing_c_cols:
+                    cursor.execute("ALTER TABLE user_constraints ADD COLUMN label TEXT NOT NULL DEFAULT '';")
+                if "metadata_json" not in existing_c_cols:
+                    cursor.execute("ALTER TABLE user_constraints ADD COLUMN metadata_json TEXT;")
+                conn.commit()
+        except Exception:
+            pass
+
     # Default demo user (standard ANSI SQL ON CONFLICT compatible with Postgres and SQLite)
     cursor.execute("""
     INSERT INTO users (id, name, email, created_at)

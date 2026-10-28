@@ -225,6 +225,15 @@ def generate_recommendation(
     gen_mode = "azure_openai" if ('llm_result' in locals() and isinstance(llm_result, dict) and llm_result.get("is_llm_generated")) else "deterministic_fallback"
     model_name = llm_result.get("model", "rule_engine") if ('llm_result' in locals() and isinstance(llm_result, dict)) else "rule_engine"
 
+    if isinstance(assumptions, str):
+        try:
+            parsed_a = json.loads(assumptions)
+            assumptions = parsed_a if isinstance(parsed_a, list) else [assumptions]
+        except Exception:
+            assumptions = [assumptions]
+    elif not isinstance(assumptions, list):
+        assumptions = list(assumptions) if assumptions else []
+
     return RecommendationRead(
         id=rec_id,
         user_id=user_id,

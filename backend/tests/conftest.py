@@ -135,6 +135,19 @@ def db():
         metrics_json TEXT NOT NULL,
         created_at TEXT NOT NULL
     );
+    CREATE TABLE user_constraints (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        constraint_type TEXT NOT NULL,
+        label TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0.0,
+        due_day INTEGER,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
     INSERT INTO users (id, name, email, created_at)
     VALUES ('default_user', 'Jordan Davis', 'jordan@finsight.local', '2026-01-01T00:00:00Z');
     """)

@@ -655,6 +655,7 @@ def get_defense_engine_metrics() -> Dict[str, Any]:
         "claim_verification_faithfulness_rate": cvr,
         "claim_verification_faithfulness_rate_display": f"{int(round(cvr * 10))}/10 personas" if cvr <= 1 else f"{cvr}",
         "constraint_satisfaction_accuracy": constraint_accuracy,
+        "upi_clustering_coverage": coverage,
         "upi_context_clustering_coverage": coverage,
         "upi_ambiguous_transfers": len(ambiguous),
         "upi_clustered_transfers": clustered_n,
