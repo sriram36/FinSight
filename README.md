@@ -39,7 +39,7 @@ Large language models generate compelling narrative prose but exhibit high failu
 
 FinSight AI resolves this by enforcing a strict boundary between deterministic financial mathematics and language generation:
 1. **Mathematical Isolation:** All aggregation, period normalization, and daily pacing calculations occur deterministically in Python. LLMs never compute arithmetic totals.
-2. **Strict Claim Verification:** Every recommendation generated under System C must cite itemized source transaction identifiers. An automated verifier extracts every numeric token in the generated text and cross-examines it against empirical receipts within a 1.5% rounding margin.
+2. **Strict Claim Verification:** Every recommendation generated under System C must cite itemized source transaction identifiers. An automated verifier extracts every numeric token in the generated text and cross-examines it against empirical receipts within a 1% rounding margin.
 3. **Protected Category Invariants:** Essential categories designated by the user (e.g., Healthcare, Housing) are structurally shielded. Neither the recommendation pipeline nor the purchase simulator may propose reductions to protected essentials.
 
 ---
