@@ -190,7 +190,7 @@ Detailed walkthroughs are provided in the [Production Deployment Handbook](docs/
 All mathematical transformations, API routers, database adapters, and claim verifiers are covered by automated unit and integration tests:
 
 ```bash
-# Run complete test suite (34 tests)
+# Run complete test suite (60 tests)
 pytest backend/tests/ -v
 
 # Run full-system end-to-end user journey test
